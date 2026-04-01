@@ -44,10 +44,9 @@ SUBJECTS_DATA = {
     "Technology": ["SFT", "Engineering Tech", "Bio Systems Tech", "ICT"]
 }
 
-# --- Session State for Login ---
+# --- Login Logic ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- Sidebar Access Control ---
 st.sidebar.title("🔐 Access Control")
 auth_mode = st.sidebar.selectbox("තෝරන්න", ["Login", "Sign Up"])
 
@@ -61,7 +60,6 @@ if auth_mode == "Sign Up":
                 conn.commit()
                 st.sidebar.success("සාර්ථකයි! දැන් Login වන්න.")
             except: st.sidebar.error("මෙම නම දැනටමත් පවතී.")
-
 elif auth_mode == "Login":
     u_in = st.sidebar.text_input("Username")
     p_in = st.sidebar.text_input("Password", type='password')
@@ -73,21 +71,20 @@ elif auth_mode == "Login":
                 st.rerun()
             else: st.sidebar.error("නම හෝ මුරපදය වැරදියි.")
 
-# --- Main App ---
+# --- Main App Logic ---
 if st.session_state.logged_in:
-    # Header Section
     st.markdown(f"<div class='welcome-header'>🎓 A/L Smart Study Tracker Pro</div>", unsafe_allow_html=True)
     st.markdown(f"Concept by: **Plan Master Charaka Dhananjaya** | Developed by: <span class='business-name'>Hiratrix IT Solutions</span>", unsafe_allow_html=True)
     st.divider()
 
-    tab1, tab2 = st.tabs(["📝 අද දත්ත ඇතුළත් කිරීම", "📊 පැරණි වාර්තා පරීක්ෂාව"])
+    tab1, tab2 = st.tabs(["📝 අද දත්ත ඇතුළත් කිරීම සහ සාරාංශය", "📊 පැරණි වාර්තා පරීක්ෂාව"])
 
     with tab1:
         st.subheader(f"👋 සාදරයෙන් පිළිගනිමු, {st.session_state.username.capitalize()}!")
         
-        # Sidebar Data Entry
+        # --- Data Entry (Sidebar) ---
         st.sidebar.subheader("📝 දත්ත ඇතුළත් කරන්න")
-        entry_date = st.sidebar.date_input("දත්ත ඇතුළත් කරන දිනය", datetime.now())
+        entry_date = st.sidebar.date_input("අද දිනය", datetime.now())
         stream_choice = st.sidebar.selectbox("විෂය ධාරාව", list(SUBJECTS_DATA.keys()))
         available_subjects = SUBJECTS_DATA[stream_choice]
 
@@ -96,7 +93,8 @@ if st.session_state.logged_in:
             st.sidebar.write(f"--- විෂය {i+1} ---")
             name = st.sidebar.selectbox(f"තෝරන්න {i+1}", available_subjects, key=f"n{i}", index=i if i < len(available_subjects) else 0)
             c_h, c_m = st.sidebar.columns(2)
-            h = c_h.number_input("Hours", 0, 24, key=f"h{i}")
+            # උපරිම පැය 20 ක සීමාව මෙහි ඇත
+            h = c_h.number_input("Hours", 0, 20, key=f"h{i}")
             m = c_m.number_input("Mins", 0, 59, key=f"m{i}")
             s_names.append(name)
             s_hours.append(h + (m/60))
@@ -111,30 +109,30 @@ if st.session_state.logged_in:
                 conn.commit()
             st.success(f"{entry_date} දත්ත සුරැකුණා!")
 
-    with tab2:
-        st.header("🔍 සතිපතා වාර්තා පරීක්ෂාව")
-        # මෙන්න ඔබ ඉල්ලූ සතිය තෝරන කැලැන්ඩරය (Calendar)
-        report_start = st.date_input("සතිය ආරම්භ වන දිනය තෝරන්න (Select Week Start Date)", datetime.now() - timedelta(days=6), key="rep_cal")
-        report_end = report_start + timedelta(days=6)
+        # --- Current Week Summary with Calendar ---
+        st.markdown("### 📅 මෙම සතියේ සාරාංශය")
+        # අද දත්ත පටිත්තේදීම සතිය තෝරාගත හැකි කැලැන්ඩරය
+        current_week_start = st.date_input("සතිපතා ප්‍රස්ථාරය සඳහා ආරම්භක දිනය තෝරන්න", datetime.now() - timedelta(days=6), key="main_cal")
+        current_week_end = current_week_start + timedelta(days=6)
         
-        st.info(f"පෙන්වන කාල සීමාව: {report_start} සිට {report_end} දක්වා")
-
         with sqlite3.connect('alevel_tracker_final.db') as conn:
             df = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username = '{st.session_state.username}'", conn)
 
         if not df.empty:
             df['date'] = pd.to_datetime(df['date']).dt.date
-            mask = (df['date'] >= report_start) & (df['date'] <= report_end)
+            mask = (df['date'] >= current_week_start) & (df['date'] <= current_week_end)
             week_df = df.loc[mask].sort_values('date')
 
             if not week_df.empty:
+                # 1. Metrics
                 total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
                 m1, m2, m3 = st.columns(3)
                 m1.metric("සතියේ මුළු පැය", f"{total_h:.1f} h")
                 m2.metric("දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
                 m3.metric("සටහන් කළ දින", f"{len(week_df)} / 7")
 
-                st.divider()
+                # 2. Subject Totals
+                st.write("---")
                 last_entry = week_df.iloc[-1]
                 names = [last_entry['sub1_name'], last_entry['sub2_name'], last_entry['sub3_name']]
                 totals = [week_df['sub1_h'].sum(), week_df['sub2_h'].sum(), week_df['sub3_h'].sum()]
@@ -143,15 +141,26 @@ if st.session_state.logged_in:
                 for i, col in enumerate([c1, c2, c3]):
                     col.markdown(f"<div class='subject-card'>{names[i]}<br>මුළු කාලය: {totals[i]:.1f} h</div>", unsafe_allow_html=True)
 
-                st.subheader("📊 සතිපතා ප්‍රස්ථාරය")
+                # 3. Weekly Chart
+                st.subheader("📊 සතිපතා ප්‍රස්ථාරය (Weekly Chart)")
                 fig, ax = plt.subplots(figsize=(10, 4))
                 week_df.plot(kind='bar', x='date', ax=ax, color=['#2ecc71', '#3498db', '#e67e22'])
                 ax.legend(names)
+                plt.xticks(rotation=45)
                 st.pyplot(fig)
             else:
                 st.warning("තෝරාගත් කාල සීමාව සඳහා දත්ත නැත.")
         else:
-            st.info("පැරණි දත්ත බැලීමට ප්‍රථමයෙන් දත්ත ඇතුළත් කරන්න.")
+            st.info("දත්ත ඇතුළත් කළ පසු මෙහි ප්‍රස්ථාරය දර්ශනය වනු ඇත.")
+
+    with tab2:
+        st.header("🔍 විස්තරාත්මක පැරණි වාර්තා")
+        # මෙහිදීද අවශ්‍ය නම් පැරණි වාර්තා වෙනම බැලිය හැක
+        st.write("ඔබේ සියලුම දත්ත සටහන මෙතැනින් බලන්න:")
+        if not df.empty:
+            st.dataframe(df.sort_values('date', ascending=False), use_container_width=True)
+        else:
+            st.warning("දත්ත කිසිවක් නැත.")
 
     st.sidebar.divider()
     if st.sidebar.button("Log Out"):
@@ -160,4 +169,4 @@ if st.session_state.logged_in:
 
 else:
     st.title("🎓 A/L Smart Study Tracker Pro")
-    st.info("පද්ධතිය භාවිතා කිරීමට කරුණාකර Login වන්න.")
+    st.info("පද්ධතිය භාවිතා කිරීමට Sidebar එකෙන් Login වන්න.")
