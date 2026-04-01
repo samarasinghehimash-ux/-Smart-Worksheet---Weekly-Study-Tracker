@@ -30,7 +30,7 @@ st.markdown("""
     [data-testid="stMetricLabel"] p { color: #000000 !important; font-weight: bold !important; font-size: 1.1rem !important; }
     div[data-testid="stMetric"] { background-color: #ffffff !important; padding: 20px; border-radius: 12px; border: 1px solid #dddddd; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .subject-card { background-color: #f0f7ff; padding: 15px; border-radius: 10px; border-left: 5px solid #2196f3; color: #000000 !important; margin-bottom: 10px; font-weight: bold; }
-    .report-header { background-color: #2c3e50; color: white; padding: 10px; border-radius: 5px; text-align: center; margin-bottom: 20px; }
+    .welcome-text { font-size: 1.5rem; color: #2c3e50; font-weight: bold; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -43,9 +43,10 @@ SUBJECTS_DATA = {
     "Technology": ["SFT", "Engineering Tech", "Bio Systems Tech", "ICT"]
 }
 
-# --- Login Logic ---
+# --- Session State for Login ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
+# --- Sidebar Access Control ---
 st.sidebar.title("🔐 Access Control")
 auth_mode = st.sidebar.selectbox("තෝරන්න", ["Login", "Sign Up"])
 
@@ -61,30 +62,30 @@ if auth_mode == "Sign Up":
             except: st.sidebar.error("මෙම නම දැනටමත් පවතී.")
 
 elif auth_mode == "Login":
-    username = st.sidebar.text_input("Username")
-    password = st.sidebar.text_input("Password", type='password')
+    username_input = st.sidebar.text_input("Username")
+    password_input = st.sidebar.text_input("Password", type='password')
     if st.sidebar.button("ඇතුළු වන්න"):
         with sqlite3.connect('alevel_tracker_final.db') as conn:
-            data = conn.execute('SELECT password FROM users WHERE username =?', (username,)).fetchone()
-            if data and check_hashes(password, data[0]):
-                st.session_state.logged_in, st.session_state.username = True, username
+            data = conn.execute('SELECT password FROM users WHERE username =?', (username_input,)).fetchone()
+            if data and check_hashes(password_input, data[0]):
+                st.session_state.logged_in, st.session_state.username = True, username_input
                 st.rerun()
             else: st.sidebar.error("නම හෝ මුරපදය වැරදියි.")
 
-# --- Main App ---
+# --- Main App Logic ---
 if st.session_state.logged_in:
-    st.sidebar.success(f"User: {st.session_state.username}")
-    
-    # පටිත්ත (Tabs) මගින් අද දත්ත සහ පැරණි වාර්තා වෙන් කිරීම
+    # පටිති (Tabs) පද්ධතිය
     tab1, tab2 = st.tabs(["📝 අද දත්ත ඇතුළත් කිරීම", "📊 පැරණි වාර්තා පරීක්ෂාව"])
 
     with tab1:
         st.title("🎓 Daily Study Tracker")
+        st.markdown(f"<div class='welcome-text'>👋 සාදරයෙන් පිළිගනිමු, {st.session_state.username.capitalize()}!</div>", unsafe_allow_html=True)
         st.markdown("Concept by: **Plan Master Charaka Dhananjaya**")
-        
-        # දත්ත ඇතුළත් කිරීමේ Sidebar එක
+        st.divider()
+
+        # Sidebar Data Entry
         st.sidebar.subheader("📝 දත්ත ඇතුළත් කරන්න")
-        entry_date = st.sidebar.date_input("දිනය", datetime.now(), key="entry_date")
+        entry_date = st.sidebar.date_input("දත්ත ඇතුළත් කරන දිනය", datetime.now(), key="main_entry_date")
         stream_choice = st.sidebar.selectbox("විෂය ධාරාව", list(SUBJECTS_DATA.keys()))
         available_subjects = SUBJECTS_DATA[stream_choice]
 
@@ -104,17 +105,16 @@ if st.session_state.logged_in:
                               sub3_name=excluded.sub3_name, sub3_h=excluded.sub3_h''', 
                            (st.session_state.username, str(entry_date), stream_choice, s_names[0], s_hours[0], s_names[1], s_hours[1], s_names[2], s_hours[2]))
                 conn.commit()
-            st.success(f"{entry_date} දත්ත සුරැකුණා!")
+            st.success(f"{entry_date} දිනට අදාළ දත්ත සාර්ථකව සුරැකුණා!")
 
     with tab2:
-        st.header("🔍 පැරණි සතිපතා වාර්තා බැලීම")
-        st.write("ඔබට අවශ්‍ය සතියේ **ආරම්භක දිනය** පහත කැලැන්ඩරයෙන් තෝරන්න.")
+        st.header("🔍 වාර්තා පරීක්ෂාව (Weekly Reports)")
         
-        # කැලැන්ඩරය හරහා සතිය තේරීම
-        report_start = st.date_input("සතිය ආරම්භ වන දිනය තෝරන්න", datetime.now() - timedelta(days=6), key="report_date")
+        # දින දර්ශනය (Calendar) හරහා සතිය තේරීම
+        report_start = st.date_input("සතිය ආරම්භ වන දිනය තේරන්න (Calendar)", datetime.now() - timedelta(days=6), key="report_calendar")
         report_end = report_start + timedelta(days=6)
         
-        st.markdown(f"<div class='report-header'>වාර්තාව: {report_start} සිට {report_end} දක්වා</div>", unsafe_allow_html=True)
+        st.info(f"පෙන්වන කාල සීමාව: {report_start} සිට {report_end} දක්වා")
 
         with sqlite3.connect('alevel_tracker_final.db') as conn:
             df = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username = '{st.session_state.username}'", conn)
@@ -130,7 +130,7 @@ if st.session_state.logged_in:
                 m1, m2, m3 = st.columns(3)
                 m1.metric("සතියේ මුළු පැය", f"{total_h:.1f} h")
                 m2.metric("දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
-                m3.metric("දත්ත ඇති දින", f"{len(week_df)} / 7")
+                m3.metric("සටහන් කළ දින", f"{len(week_df)} / 7")
 
                 st.divider()
                 
@@ -141,29 +141,32 @@ if st.session_state.logged_in:
                 
                 c1, c2, c3 = st.columns(3)
                 for i, col in enumerate([c1, c2, c3]):
-                    col.markdown(f"<div class='subject-card'>{sub_names[i]}<br>මුළු කාලය: {sub_totals[i]:.1f} h</div>", unsafe_allow_html=True)
+                    col.markdown(f"<div class='subject-card'>{sub_names[i]}<br>Total: {sub_totals[i]:.1f} h</div>", unsafe_allow_html=True)
 
                 # Weekly Chart
-                st.subheader("📊 සතිපතා ප්‍රස්ථාරය")
+                st.subheader("📊 සතිපතා විශ්ලේෂණය")
                 fig, ax = plt.subplots(figsize=(10, 4))
                 week_df.plot(kind='bar', x='date', ax=ax, color=['#2ecc71', '#3498db', '#e67e22'])
                 ax.legend(sub_names)
                 plt.xticks(rotation=45)
                 st.pyplot(fig)
-                
-                # Data Table
-                with st.expander("විස්තරාත්මක දත්ත සටහන බලන්න"):
-                    st.dataframe(week_df, use_container_width=True)
             else:
-                st.warning(f"{report_start} සිට {report_end} දක්වා කාල සීමාව තුළ ඔබ දත්ත ඇතුළත් කර නැත.")
+                st.warning(f"තෝරාගත් කාල සීමාව ({report_start} - {report_end}) සඳහා දත්ත හමු නොවීය.")
         else:
-            st.info("ඔබ තවම දත්ත කිසිවක් ඇතුළත් කර නැත.")
+            st.info("පැරණි දත්ත පෙන්වීමට නම් ප්‍රථමයෙන් දත්ත ඇතුළත් කර තිබිය යුතුය.")
 
+    # Sidebar Logout and Delete
     st.sidebar.divider()
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False
         st.rerun()
+    
+    if st.sidebar.button("🗑️ මගේ සියලු දත්ත මකන්න"):
+        with sqlite3.connect('alevel_tracker_final.db') as conn:
+            conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
+            conn.commit()
+        st.rerun()
 
 else:
     st.title("🎓 A/L Smart Study Tracker Pro")
-    st.info("පද්ධතිය භාවිතා කිරීමට කරුණාකර Login වන්න. ඔබට ගිණුමක් නැතිනම් Sign Up වන්න.")
+    st.info("ඉදිරියට යාමට කරුණාකර Login වන්න. ඔබට ගිණුමක් නැතිනම් Sign Up වන්න.")
