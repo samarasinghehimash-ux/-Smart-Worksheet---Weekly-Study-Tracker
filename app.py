@@ -6,14 +6,13 @@ from datetime import datetime, timedelta
 
 # 1. Database Setup
 def init_db():
-    conn = sqlite3.connect('alevel_tracker_v5.db')
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS study_logs 
-                      (user_name TEXT, date TEXT, stream TEXT, sub1_name TEXT, sub1_h REAL, 
-                       sub2_name TEXT, sub2_h REAL, sub3_name TEXT, sub3_h REAL, 
-                      UNIQUE(user_name, date))''')
-    conn.commit()
-    conn.close()
+    with sqlite3.connect('alevel_tracker_v5.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute('''CREATE TABLE IF NOT EXISTS study_logs 
+                          (user_name TEXT, date TEXT, stream TEXT, sub1_name TEXT, sub1_h REAL, 
+                           sub2_name TEXT, sub2_h REAL, sub3_name TEXT, sub3_h REAL, 
+                          UNIQUE(user_name, date))''')
+        conn.commit()
 
 init_db()
 
@@ -29,22 +28,21 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- Subject List Configuration (විෂයන් ලැයිස්තුව) ---
+# --- Subject List Configuration ---
 SUBJECTS_DATA = {
     "Physical Science (Maths)": ["Combined Maths", "Physics", "Chemistry", "ICT"],
     "Biological Science (Bio)": ["Biology", "Chemistry", "Physics", "Agricultural Science"],
     "Commerce": ["Accounting", "Business Studies", "Economics", "ICT", "Business Statistics"],
-    "Arts": ["Sinhala", "History", "Logic", "Political Science", "Geography", "Buddhist Civilization", "Economics", "ICT", "English", "Tamil", "Arabic"],
-    "Technology": ["SFT", "Engineering Tech", "Bio Systems Tech", "ICT", "Economics", "Geography", "English"]
+    "Arts": ["Sinhala", "History", "Logic", "Political Science", "Geography", "Buddhist Civilization", "Economics", "ICT", "English"],
+    "Technology": ["SFT", "Engineering Tech", "Bio Systems Tech", "ICT", "Economics"]
 }
 
 # --- Header ---
 st.title("🎓 A/L Smart Study Tracker Pro")
-# ගුරුතුමාගේ නම සහ Hiratrix ආයතනය
 st.markdown("Concept by: **Plan Master Charaka Dhananjaya** | Developed by: **Hiratrix IT Solutions**")
 st.divider()
 
-# --- Sidebar: Settings ---
+# --- Sidebar: User Settings ---
 st.sidebar.header("👤 User Settings")
 user_id = st.sidebar.text_input("ඔබේ නම (Username)", "Guest").strip().lower()
 
@@ -57,11 +55,10 @@ st.sidebar.divider()
 st.sidebar.subheader("📝 Daily Entry")
 entry_date = st.sidebar.date_input("දත්ත ඇතුළත් කරන දිනය", datetime.now())
 
-# 1. විෂය ධාරාව තෝරාගැනීම
+# 1. විෂය ධාරාව සහ විෂයන් Dropdown හරහා තෝරාගැනීම
 stream_choice = st.sidebar.selectbox("විෂය ධාරාව (Stream)", list(SUBJECTS_DATA.keys()))
 available_subjects = SUBJECTS_DATA[stream_choice]
 
-# 2. විෂයන් තෝරාගැනීම (ඊතලය සහිත Dropdown)
 st.sidebar.write("---")
 sub1_name = st.sidebar.selectbox("1 වෙනි විෂය තෝරන්න", available_subjects, index=0)
 c1_h, c1_m = st.sidebar.columns(2)
@@ -83,15 +80,15 @@ m3 = c3_m.number_input("Minutes", 0, 59, key="m3")
 if st.sidebar.button("SAVE DATA", use_container_width=True):
     if user_id != "guest":
         s1, s2, s3 = h1+(m1/60), h2+(m2/60), h3+(m3/60)
-        conn = sqlite3.connect('alevel_tracker_v5.db')
-        cursor = conn.cursor()
-        cursor.execute('''INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) 
-                          ON CONFLICT(user_name, date) DO UPDATE SET 
-                          stream=excluded.stream, sub1_name=excluded.sub1_name, sub1_h=excluded.sub1_h,
-                          sub2_name=excluded.sub2_name, sub2_h=excluded.sub2_h,
-                          sub3_name=excluded.sub3_name, sub3_h=excluded.sub3_h''', 
-                       (user_id, str(entry_date), stream_choice, sub1_name, s1, sub2_name, s2, sub3_name, s3))
-        conn.commit(); conn.close()
+        with sqlite3.connect('alevel_tracker_v5.db') as conn:
+            cursor = conn.cursor()
+            cursor.execute('''INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) 
+                              ON CONFLICT(user_name, date) DO UPDATE SET 
+                              stream=excluded.stream, sub1_name=excluded.sub1_name, sub1_h=excluded.sub1_h,
+                              sub2_name=excluded.sub2_name, sub2_h=excluded.sub2_h,
+                              sub3_name=excluded.sub3_name, sub3_h=excluded.sub3_h''', 
+                           (user_id, str(entry_date), stream_choice, sub1_name, s1, sub2_name, s2, sub3_name, s3))
+            conn.commit()
         st.sidebar.success("දත්ත සාර්ථකව සුරැකුණා!")
         st.rerun()
     else:
@@ -104,9 +101,8 @@ end_date = start_date + timedelta(days=6)
 st.info(f"පෙන්වන කාල සීමාව: {start_date} සිට {end_date} දක්වා")
 st.divider()
 
-conn = sqlite3.connect('alevel_tracker_v5.db')
-df_all = pd.read_sql_query(f"SELECT * FROM study_logs WHERE user_name = '{user_id}'", conn)
-conn.close()
+with sqlite3.connect('alevel_tracker_v5.db') as conn:
+    df_all = pd.read_sql_query(f"SELECT * FROM study_logs WHERE user_name = '{user_id}'", conn)
 
 st.subheader(f"👋 සාදරයෙන් පිළිගනිමු, {user_id.capitalize()}!")
 
@@ -116,7 +112,6 @@ if not df_all.empty:
     df = df_all.loc[mask].sort_values('date')
 
     if not df.empty:
-        # Metrics
         total_h = df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
         col1, col2, col3 = st.columns(3)
         col1.metric("සතියේ මුළු පැය", f"{total_h:.1f} h")
@@ -125,9 +120,7 @@ if not df_all.empty:
 
         st.divider()
         
-        # Subject Totals
         st.subheader("විෂය අනුව එකතුව")
-        # අවසන් වරට දත්ත ඇතුළත් කළ විෂය නම් ලබාගැනීම
         last_names = [df.iloc[-1]['sub1_name'], df.iloc[-1]['sub2_name'], df.iloc[-1]['sub3_name']]
         s1_t, s2_t, s3_t = df['sub1_h'].sum(), df['sub2_h'].sum(), df['sub3_h'].sum()
         
@@ -136,7 +129,6 @@ if not df_all.empty:
         c2.info(f"**{last_names[1]}**\n\n{s2_t:.1f} h")
         c3.info(f"**{last_names[2]}**\n\n{s3_t:.1f} h")
 
-        # Chart
         st.subheader("සතිපතා විශ්ලේෂණය")
         fig, ax = plt.subplots(figsize=(12, 5))
         df.plot(kind='bar', x='date', ax=ax, color=['#2ecc71', '#3498db', '#e67e22'])
@@ -147,3 +139,13 @@ if not df_all.empty:
         st.warning("තෝරාගත් කාල සීමාව සඳහා දත්ත නැත.")
 else:
     st.info("පසෙකින් ඇති පුවරුවෙන් අද දින දත්ත ඇතුළත් කරන්න.")
+
+# --- Reset Button (නිවැරදි කරන ලද කොටස) ---
+st.sidebar.divider()
+if st.sidebar.button("🗑️ DELETE ALL DATA"):
+    with sqlite3.connect('alevel_tracker_v5.db') as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM study_logs")
+        conn.commit()
+    st.sidebar.success("සියලු දත්ත මකා දමන ලදී!")
+    st.rerun()
