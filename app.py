@@ -26,14 +26,23 @@ init_db()
 # --- Page Config ---
 st.set_page_config(page_title="A/L Study Tracker Pro", layout="wide")
 
-# --- UI Styles ---
+# --- UI Styles (CSS) ---
 st.markdown("""
     <style>
     .main-title { font-size: 3rem !important; font-weight: 900 !important; color: #ffffff; text-align: center; text-shadow: 2px 2px 4px #000; margin-bottom: 10px; }
-    [data-testid="stMetricValue"] { color: #000 !important; font-weight: bold !important; font-size: 2rem !important; }
+    
+    /* සුදු කොටු වල මාතෘකා තද වර්ණයෙන් පෙන්වීමට */
+    [data-testid="stMetricLabel"] p { color: #1a1a1a !important; font-weight: bold !important; font-size: 1.1rem !important; opacity: 1 !important; }
+    [data-testid="stMetricValue"] { color: #000000 !important; font-weight: bold !important; }
     div[data-testid="stMetric"] { background-color: #ffffff !important; padding: 15px; border-radius: 12px; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-    .subject-card { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; color: #000 !important; margin-bottom: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    
+    /* විෂය කාඩ්පත් වල මාතෘකා */
+    .subject-card { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; color: #000000 !important; margin-bottom: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .subject-label { color: #1a1a1a !important; font-size: 1rem; }
+    
     .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.3rem; font-weight: bold; margin: 15px 0; border: 2px solid; }
+    
+    /* ව්‍යාපාර නාමය කොළ පැහැයෙන් */
     .business-name { color: #2ecc71 !important; font-weight: bold; font-size: 1.2rem; }
     </style>
     """, unsafe_allow_html=True)
@@ -58,8 +67,7 @@ if not st.session_state.logged_in:
         with sqlite3.connect('alevel_tracker_final.db') as conn:
             data = conn.execute('SELECT password FROM users WHERE username =?', (u_in,)).fetchone()
             if data and check_hashes(p_in, data[0]):
-                st.session_state.logged_in = True
-                st.session_state.username = u_in
+                st.session_state.logged_in, st.session_state.username = True, u_in
                 st.rerun()
             else: st.sidebar.error("වැරදි දත්ත ඇතුළත් කළා.")
 else:
@@ -85,6 +93,7 @@ def display_full_analytics(df, start_date):
         else:
             st.markdown(f'<div class="feedback-box" style="background-color: #fff8e1; color: #ff8f00; border-color: #ffe082;">🔥 සුපිරි! ඔබ ඉතා දක්ෂ ලෙස වැඩ කර තිබෙනවා! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
 
+        # Metrics (මෙහි මාතෘකා දැන් තද වර්ණයෙන් පෙනේ)
         m1, m2, m3 = st.columns(3)
         m1.metric("📅 සතියේ මුළු පැය", f"{total_h:.1f} h")
         m2.metric("📊 දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
@@ -97,8 +106,9 @@ def display_full_analytics(df, start_date):
         
         cols = st.columns(3)
         for i in range(3):
-            cols[i].markdown(f"<div class='subject-card'>විෂය: {sub_names[i]}<br><span style='font-size: 1.5rem; color: #2196f3;'>{sub_totals[i]:.1f} h</span></div>", unsafe_allow_html=True)
+            cols[i].markdown(f"<div class='subject-card'><span class='subject-label'>විෂය: {sub_names[i]}</span><br><span style='font-size: 1.5rem; color: #2196f3;'>{sub_totals[i]:.1f} h</span></div>", unsafe_allow_html=True)
         
+        # Grouped Chart
         st.markdown(f"### 📈 ප්‍රගති ප්‍රස්ථාරය ({start_date} සිට {end_date} දක්වා)")
         fig, ax = plt.subplots(figsize=(12, 5))
         dates = week_df['date'].astype(str).tolist()
@@ -109,7 +119,7 @@ def display_full_analytics(df, start_date):
         ax.bar(x + width, week_df['sub3_h'], width, label=sub_names[2], color='#e67e22')
         ax.set_xticks(x); ax.set_xticklabels(dates, rotation=45); ax.legend()
         st.pyplot(fig)
-    else: st.warning("තෝරාගත් කාලසීමාව සඳහා දත්ත නැත.")
+    else: st.warning("දත්ත නැත.")
 
 # --- Main App ---
 if st.session_state.logged_in:
@@ -125,7 +135,7 @@ if st.session_state.logged_in:
         if not all_logs.empty:
             all_logs['date'] = pd.to_datetime(all_logs['date']).dt.date
             sel_u = st.selectbox("ශිෂ්‍යයා තෝරන්න", all_logs['username'].unique())
-            adm_d = st.date_input("පරීක්ෂා කළ යුතු සතියේ ආරම්භය", datetime.now() - timedelta(days=6))
+            adm_d = st.date_input("සතියේ ආරම්භය", datetime.now() - timedelta(days=6))
             display_full_analytics(all_logs[all_logs['username'] == sel_u], adm_d)
     else:
         tab1, tab2 = st.tabs(["📝 දත්ත ඇතුළත් කිරීම", "📊 පැරණි වාර්තා"])
@@ -134,12 +144,12 @@ if st.session_state.logged_in:
 
         with tab1:
             st.sidebar.subheader("📝 දත්ත සටහන් කරන්න")
-            e_date = st.sidebar.date_input("දිනය තෝරන්න", datetime.now())
-            stream = st.sidebar.selectbox("විෂය ධාරාව", list(SUBJECTS_DATA.keys()))
+            e_date = st.sidebar.date_input("දිනය", datetime.now())
+            stream = st.sidebar.selectbox("ධාරාව", list(SUBJECTS_DATA.keys()))
             names, hrs = [], []
             for i in range(3):
                 st.sidebar.write(f"--- විෂය {i+1} ---")
-                n = st.sidebar.selectbox(f"තෝරන්න {i+1}", SUBJECTS_DATA[stream], key=f"n{i}", index=i)
+                n = st.sidebar.selectbox(f"තෝරන්න", SUBJECTS_DATA[stream], key=f"n{i}", index=i)
                 c1, c2 = st.sidebar.columns(2)
                 h = c1.number_input("පැය", 0, 24, key=f"h{i}")
                 m = c2.number_input("මිනිත්තු", 0, 59, key=f"m{i}")
@@ -153,19 +163,13 @@ if st.session_state.logged_in:
             # --- Delete Buttons ---
             st.sidebar.divider()
             st.sidebar.subheader("🗑️ දත්ත කළමනාකරණය")
-            
-            # 1. Delete Today
             if st.sidebar.button("🗑️ අද දත්ත මකන්න"):
                 conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date='{e_date}'")
                 conn.commit(); st.rerun()
-            
-            # 2. Delete Selected Week
             if st.sidebar.button("🚨 සතියේ දත්ත මකන්න"):
                 e_range = e_date + timedelta(days=6)
                 conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date BETWEEN '{e_date}' AND '{e_range}'")
                 conn.commit(); st.rerun()
-            
-            # 3. Delete All Data
             if st.sidebar.button("🔥 සියලුම දත්ත මකන්න"):
                 conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
                 conn.commit(); st.rerun()
