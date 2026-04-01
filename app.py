@@ -36,6 +36,7 @@ st.markdown("""
     .subject-card { background-color: #ffffff; padding: 18px; border-radius: 12px; border-left: 10px solid #2196f3; color: #000000 !important; margin-bottom: 12px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.05); font-size: 1.1rem; }
     .feedback-box { padding: 20px; border-radius: 15px; text-align: center; font-size: 1.5rem; font-weight: bold; margin: 20px 0; border: 2px solid; }
     .business-name { color: #2ecc71; font-weight: bold; font-size: 1.2rem; }
+    .stButton>button { border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,69 +81,59 @@ def display_full_analytics(df, start_date):
         else:
             st.markdown(f'<div class="feedback-box" style="background-color: #fff8e1; color: #ff8f00; border-color: #ffe082;">🔥 සුපිරි! ඔබ ඉතා දක්ෂ ලෙස වැඩ කර තිබෙනවා. මේ විදිහටම කරගෙන යමු! (Total: {total_h:.1f}h)</div>', unsafe_allow_html=True)
 
-        # 2. Metrics
         m1, m2, m3 = st.columns(3)
         m1.metric("📅 සතියේ මුළු පැය", f"{total_h:.1f} h")
         m2.metric("📊 දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
         m3.metric("✅ සටහන් කළ දින", f"{len(week_df)} / 7")
-        
         st.write("---")
         
-        # 3. Subject Cards
         last_entry = week_df.iloc[-1]
         sub_names = [last_entry['sub1_name'], last_entry['sub2_name'], last_entry['sub3_name']]
-        
-        sub_totals = {
-            sub_names[0]: week_df['sub1_h'].sum(),
-            sub_names[1]: week_df['sub2_h'].sum(),
-            sub_names[2]: week_df['sub3_h'].sum()
-        }
+        sub_totals = {sub_names[0]: week_df['sub1_h'].sum(), sub_names[1]: week_df['sub2_h'].sum(), sub_names[2]: week_df['sub3_h'].sum()}
 
         cols = st.columns(3)
         for i, (name, val) in enumerate(sub_totals.items()):
             cols[i].markdown(f"<div class='subject-card'><span style='color: #555;'>විෂය:</span> {name}<br><span style='font-size: 1.5rem; color: #2196f3;'>{val:.1f} h</span></div>", unsafe_allow_html=True)
         
-        # 4. Grouped Bar Chart (විෂයන් 3 තීරු 3කින්)
         st.markdown(f"### 📈 ප්‍රගති ප්‍රස්ථාරය ({start_date} සිට {end_date} දක්වා)")
-        
         fig, ax = plt.subplots(figsize=(14, 6))
-        
         dates = week_df['date'].astype(str).tolist()
         x = np.arange(len(dates))
-        width = 0.25  # තීරු වල පළල
-        
+        width = 0.25
         ax.bar(x - width, week_df['sub1_h'], width, label=sub_names[0], color='#2ecc71')
         ax.bar(x, week_df['sub2_h'], width, label=sub_names[1], color='#3498db')
         ax.bar(x + width, week_df['sub3_h'], width, label=sub_names[2], color='#e67e22')
-        
-        ax.set_ylabel('පැය ගණන (Hours)')
-        ax.set_xticks(x)
-        ax.set_xticklabels(dates, rotation=45)
-        ax.legend()
-        plt.grid(axis='y', linestyle='--', alpha=0.3)
+        ax.set_xticks(x); ax.set_xticklabels(dates, rotation=45); ax.legend()
         st.pyplot(fig)
-    else:
-        st.warning(f"{start_date} සිට {end_date} දක්වා දත්ත නැත.")
+    else: st.warning(f"දත්ත නැත.")
 
-# --- Main App ---
+# --- Main App Logic ---
 if st.session_state.logged_in:
     st.markdown('<p class="main-title">🎓 A/L Study Tracker Pro</p>', unsafe_allow_html=True)
     st.markdown(f"<div style='text-align: center;'>Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class='business-name'>Hiratrix IT Solutions</span></div>", unsafe_allow_html=True)
     st.divider()
 
+    conn_db = sqlite3.connect('alevel_tracker_final.db')
+
     if st.session_state.username == "admin":
-        st.header("👨‍🏫 ගුරු මණ්ඩල පුවරුව")
-        with sqlite3.connect('alevel_tracker_final.db') as conn:
-            all_logs = pd.read_sql_query("SELECT * FROM study_logs", conn)
+        st.header("👨‍🏫 ගුරු මණ්ඩල පුවරුව (Admin)")
+        all_logs = pd.read_sql_query("SELECT * FROM study_logs", conn_db)
         if not all_logs.empty:
             all_logs['date'] = pd.to_datetime(all_logs['date']).dt.date
             selected_student = st.selectbox("ශිෂ්‍යයා තෝරන්න", all_logs['username'].unique())
             admin_date = st.date_input("සතියේ ආරම්භය", datetime.now() - timedelta(days=6))
             display_full_analytics(all_logs[all_logs['username'] == selected_student], admin_date)
+            
+            st.divider()
+            if st.button(f"🗑️ {selected_student} ගේ සියලුම දත්ත මකන්න (Danger Area)"):
+                conn_db.execute(f"DELETE FROM study_logs WHERE username='{selected_student}'")
+                conn_db.commit()
+                st.success("දත්ත මැකීම සාර්ථකයි.")
+                st.rerun()
+
     else:
         tab1, tab2 = st.tabs(["📝 දත්ත ඇතුළත් කිරීම", "📊 පැරණි වාර්තා"])
-        with sqlite3.connect('alevel_tracker_final.db') as conn:
-            my_data = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username='{st.session_state.username}'", conn)
+        my_data = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username='{st.session_state.username}'", conn_db)
         if not my_data.empty: my_data['date'] = pd.to_datetime(my_data['date']).dt.date
 
         with tab1:
@@ -155,22 +146,37 @@ if st.session_state.logged_in:
                 h = st.sidebar.number_input("Hours", 0, 20, key=f"h{i}")
                 m = st.sidebar.number_input("Mins", 0, 59, key=f"m{i}")
                 names.append(n); hours.append(h + (m/60))
+            
             if st.sidebar.button("SAVE DATA"):
-                with sqlite3.connect('alevel_tracker_final.db') as conn:
-                    conn.execute('''INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h''', (st.session_state.username, str(entry_date), stream, names[0], hours[0], names[1], hours[1], names[2], hours[2]))
+                conn_db.execute('''INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h''', (st.session_state.username, str(entry_date), stream, names[0], hours[0], names[1], hours[1], names[2], hours[2]))
+                conn_db.commit()
                 st.rerun()
             
+            # --- බොත්තම 1: අද දත්ත මකන්න ---
+            st.sidebar.divider()
+            if st.sidebar.button("🗑️ අද දත්ත මකන්න"):
+                conn_db.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date='{entry_date}'")
+                conn_db.commit()
+                st.rerun()
+                
+            # --- බොත්තම 2: සියලු දත්ත මකන්න ---
+            if st.sidebar.button("🚨 සියලු දත්ත මකන්න"):
+                conn_db.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
+                conn_db.commit()
+                st.rerun()
+
             st.markdown("### 📅 මෙම සතියේ සාරාංශය")
             main_date = st.date_input("සතිය ආරම්භ වන දිනය", datetime.now() - timedelta(days=6), key="main")
             if not my_data.empty: display_full_analytics(my_data, main_date)
 
         with tab2:
-            st.header("🔍 පැරණි වාර්තා")
+            st.header("🔍 පැරණි වාර්තා පරීක්ෂාව")
             old_date = st.date_input("සතිය ආරම්භ වන දිනය", datetime.now() - timedelta(days=14), key="old")
             if not my_data.empty: display_full_analytics(my_data, old_date)
 
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False
         st.rerun()
+    conn_db.close()
 else:
     st.info("පද්ධතිය භාවිතා කිරීමට Login වන්න.")
