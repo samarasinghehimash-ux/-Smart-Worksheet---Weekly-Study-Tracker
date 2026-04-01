@@ -19,12 +19,34 @@ init_db()
 # --- Page Config ---
 st.set_page_config(page_title="A/L Study Tracker Pro", layout="wide")
 
-# --- UI Styles ---
+# --- UI Styles (අකුරු නොපෙනෙන ගැටලුවට විසඳුම මෙහි ඇත) ---
 st.markdown("""
     <style>
-    [data-testid="stMetricValue"] { color: #1a252f !important; font-weight: bold; }
-    div[data-testid="stMetric"] { background-color: #ffffff; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
-    .stInfo { background-color: #e3f2fd; color: #0d47a1; font-weight: bold; }
+    /* ප්‍රධාන කොටු 3 හි අකුරු තද පැහැ ගැන්වීම */
+    [data-testid="stMetricValue"] {
+        color: #1a252f !important;
+        font-weight: bold;
+        font-size: 2rem !important;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #444444 !important;
+        font-weight: 500 !important;
+    }
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border: 1px solid #eeeeee;
+    }
+    /* විෂය එකතුව පෙන්වන නිල් කොටු වල අකුරු පැහැදිලි කිරීම */
+    .stAlert {
+        color: #000000 !important;
+    }
+    .stAlert p {
+        color: #000000 !important;
+        font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -55,7 +77,6 @@ st.sidebar.divider()
 st.sidebar.subheader("📝 Daily Entry")
 entry_date = st.sidebar.date_input("දත්ත ඇතුළත් කරන දිනය", datetime.now())
 
-# 1. විෂය ධාරාව සහ විෂයන් Dropdown හරහා තෝරාගැනීම
 stream_choice = st.sidebar.selectbox("විෂය ධාරාව (Stream)", list(SUBJECTS_DATA.keys()))
 available_subjects = SUBJECTS_DATA[stream_choice]
 
@@ -114,22 +135,22 @@ if not df_all.empty:
     if not df.empty:
         total_h = df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
         col1, col2, col3 = st.columns(3)
-        col1.metric("සතියේ මුළු පැය", f"{total_h:.1f} h")
-        col2.metric("දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
+        col1.metric("සතියේ මුළු පැය (Total)", f"{total_h:.1f} h")
+        col2.metric("දිනකට සාමාන්‍යය (Average)", f"{(total_h/7):.1f} h")
         col3.metric("සටහන් කළ දින", f"{len(df)} / 7")
 
         st.divider()
         
-        st.subheader("විෂය අනුව එකතුව")
+        st.subheader("විෂය අනුව එකතුව (Subject-wise Total)")
         last_names = [df.iloc[-1]['sub1_name'], df.iloc[-1]['sub2_name'], df.iloc[-1]['sub3_name']]
         s1_t, s2_t, s3_t = df['sub1_h'].sum(), df['sub2_h'].sum(), df['sub3_h'].sum()
         
         c1, c2, c3 = st.columns(3)
-        c1.info(f"**{last_names[0]}**\n\n{s1_t:.1f} h")
-        c2.info(f"**{last_names[1]}**\n\n{s2_t:.1f} h")
-        c3.info(f"**{last_names[2]}**\n\n{s3_t:.1f} h")
+        c1.info(f"**{last_names[0]}** \nTotal: {s1_t:.1f} h")
+        c2.info(f"**{last_names[1]}** \nTotal: {s2_t:.1f} h")
+        c3.info(f"**{last_names[2]}** \nTotal: {s3_t:.1f} h")
 
-        st.subheader("සතිපතා විශ්ලේෂණය")
+        st.subheader("සතිපතා විශ්ලේෂණය (Weekly Analysis)")
         fig, ax = plt.subplots(figsize=(12, 5))
         df.plot(kind='bar', x='date', ax=ax, color=['#2ecc71', '#3498db', '#e67e22'])
         ax.legend(last_names)
@@ -140,7 +161,7 @@ if not df_all.empty:
 else:
     st.info("පසෙකින් ඇති පුවරුවෙන් අද දින දත්ත ඇතුළත් කරන්න.")
 
-# --- Reset Button (නිවැරදි කරන ලද කොටස) ---
+# --- Reset Button ---
 st.sidebar.divider()
 if st.sidebar.button("🗑️ DELETE ALL DATA"):
     with sqlite3.connect('alevel_tracker_v5.db') as conn:
