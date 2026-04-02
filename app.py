@@ -31,19 +31,19 @@ st.markdown("""
     <style>
     .main-title { font-size: 3rem !important; font-weight: 900 !important; color: #ffffff; text-align: center; text-shadow: 2px 2px 4px #000; margin-bottom: 10px; }
     
-    /* සුදු කොටු වල මාතෘකා තද වර්ණයෙන් පෙන්වීමට */
-    [data-testid="stMetricLabel"] p { color: #1a1a1a !important; font-weight: bold !important; font-size: 1.1rem !important; opacity: 1 !important; }
+    /* සුදු කොටු වල මාතෘකා තද කළු පැහැයෙන් */
+    [data-testid="stMetricLabel"] p { color: #000000 !important; font-weight: 900 !important; font-size: 1.2rem !important; }
     [data-testid="stMetricValue"] { color: #000000 !important; font-weight: bold !important; }
     div[data-testid="stMetric"] { background-color: #ffffff !important; padding: 15px; border-radius: 12px; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     
     /* විෂය කාඩ්පත් වල මාතෘකා */
     .subject-card { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; color: #000000 !important; margin-bottom: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .subject-label { color: #1a1a1a !important; font-size: 1rem; }
-    
-    .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.3rem; font-weight: bold; margin: 15px 0; border: 2px solid; }
     
     /* ව්‍යාපාර නාමය කොළ පැහැයෙන් */
     .business-name { color: #2ecc71 !important; font-weight: bold; font-size: 1.2rem; }
+    
+    /* බොත්තම් වල පෙනුම */
+    .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -58,21 +58,23 @@ SUBJECTS_DATA = {
 
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- Sidebar Login ---
+# --- Sidebar Login (පැහැදිලිව පෙනෙන සේ) ---
 st.sidebar.title("🔐 Access Control")
 if not st.session_state.logged_in:
     u_in = st.sidebar.text_input("Username")
     p_in = st.sidebar.text_input("Password", type='password')
-    if st.sidebar.button("ඇතුළු වන්න"):
+    # Sign In බොත්තම
+    if st.sidebar.button("ඇතුළු වන්න (Sign In)"):
         with sqlite3.connect('alevel_tracker_final.db') as conn:
             data = conn.execute('SELECT password FROM users WHERE username =?', (u_in,)).fetchone()
             if data and check_hashes(p_in, data[0]):
-                st.session_state.logged_in, st.session_state.username = True, u_in
+                st.session_state.logged_in = True
+                st.session_state.username = u_in
                 st.rerun()
-            else: st.sidebar.error("වැරදි දත්ත ඇතුළත් කළා.")
+            else: st.sidebar.error("Username හෝ Password වැරදියි.")
 else:
     st.sidebar.success(f"පරිශීලක: {st.session_state.username}")
-    if st.sidebar.button("Log Out"):
+    if st.sidebar.button("පද්ධතියෙන් ඉවත් වන්න (Log Out)"):
         st.session_state.logged_in = False
         st.rerun()
 
@@ -85,15 +87,10 @@ def display_full_analytics(df, start_date):
     if not week_df.empty:
         total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
         
-        # Feedback System
+        # Feedback Box
         if total_h < 40:
-            st.markdown(f'<div class="feedback-box" style="background-color: #ffebee; color: #c62828; border-color: #ef9a9a;">😟 ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව ගොඩක් මහන්සි වෙන්න! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
-        elif total_h < 60:
-            st.markdown(f'<div class="feedback-box" style="background-color: #e8f5e9; color: #2e7d32; border-color: #a5d6a7;">🙂 ඉතා හොඳයි! තව උත්සාහ කරන්න, ඔබට පුළුවන්! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
-        else:
-            st.markdown(f'<div class="feedback-box" style="background-color: #fff8e1; color: #ff8f00; border-color: #ffe082;">🔥 සුපිරි! ඔබ ඉතා දක්ෂ ලෙස වැඩ කර තිබෙනවා! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
-
-        # Metrics (මෙහි මාතෘකා දැන් තද වර්ණයෙන් පෙනේ)
+            st.markdown(f'<div style="background-color: #ffebee; color: #c62828; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; border: 2px solid #ef9a9a;">😟 ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව ගොඩක් මහන්සි වෙන්න! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
+        
         m1, m2, m3 = st.columns(3)
         m1.metric("📅 සතියේ මුළු පැය", f"{total_h:.1f} h")
         m2.metric("📊 දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
@@ -106,7 +103,7 @@ def display_full_analytics(df, start_date):
         
         cols = st.columns(3)
         for i in range(3):
-            cols[i].markdown(f"<div class='subject-card'><span class='subject-label'>විෂය: {sub_names[i]}</span><br><span style='font-size: 1.5rem; color: #2196f3;'>{sub_totals[i]:.1f} h</span></div>", unsafe_allow_html=True)
+            cols[i].markdown(f"<div class='subject-card'><span style='color: #000;'>විෂය: {sub_names[i]}</span><br><span style='font-size: 1.5rem; color: #2196f3;'>{sub_totals[i]:.1f} h</span></div>", unsafe_allow_html=True)
         
         # Grouped Chart
         st.markdown(f"### 📈 ප්‍රගති ප්‍රස්ථාරය ({start_date} සිට {end_date} දක්වා)")
@@ -121,7 +118,7 @@ def display_full_analytics(df, start_date):
         st.pyplot(fig)
     else: st.warning("දත්ත නැත.")
 
-# --- Main App ---
+# --- Main App Logic ---
 if st.session_state.logged_in:
     st.markdown('<p class="main-title">🎓 A/L Smart Study Tracker Pro</p>', unsafe_allow_html=True)
     st.markdown("<div style='text-align: center;'>Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class='business-name'>Hiratrix IT Solutions</span></div>", unsafe_allow_html=True)
@@ -145,7 +142,7 @@ if st.session_state.logged_in:
         with tab1:
             st.sidebar.subheader("📝 දත්ත සටහන් කරන්න")
             e_date = st.sidebar.date_input("දිනය", datetime.now())
-            stream = st.sidebar.selectbox("ධාරාව", list(SUBJECTS_DATA.keys()))
+            stream = st.sidebar.selectbox("විෂය ධාරාව", list(SUBJECTS_DATA.keys()))
             names, hrs = [], []
             for i in range(3):
                 st.sidebar.write(f"--- විෂය {i+1} ---")
@@ -155,12 +152,12 @@ if st.session_state.logged_in:
                 m = c2.number_input("මිනිත්තු", 0, 59, key=f"m{i}")
                 names.append(n); hrs.append(h + (m/60))
             
-            if st.sidebar.button("දත්ත සුරකින්න (SAVE)"):
+            if st.sidebar.button("දත්ත සුරකින්න (SAVE DATA)"):
                 conn.execute('INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h', 
                              (st.session_state.username, str(e_date), stream, names[0], hrs[0], names[1], hrs[1], names[2], hrs[2]))
                 conn.commit(); st.rerun()
 
-            # --- Delete Buttons ---
+            # --- මකා දැමීමේ බොත්තම් 3 ---
             st.sidebar.divider()
             st.sidebar.subheader("🗑️ දත්ත කළමනාකරණය")
             if st.sidebar.button("🗑️ අද දත්ත මකන්න"):
@@ -185,4 +182,6 @@ if st.session_state.logged_in:
 
     conn.close()
 else:
-    st.info("පද්ධතිය භාවිතා කිරීමට Login වන්න.")
+    # Login වීමට පෙර පෙන්වන පණිවිඩය
+    st.warning("⚠️ පද්ධතිය භාවිතා කිරීමට කරුණාකර Sidebar එක හරහා Login වන්න.")
+    st.info("පැති තීරුවේ (Sidebar) ඇති Username සහ Password ඇතුළත් කර 'ඇතුළු වන්න' බොත්තම ඔබන්න.")
