@@ -28,34 +28,37 @@ init_db()
 # --- Page Config ---
 st.set_page_config(page_title="A/L Study Tracker Pro", layout="wide")
 
-# --- UI Styles (CSS) ---
+# --- UI Styles (අකුරු සහ කොටු කැපී පෙනෙන ලෙස සකස් කළ CSS) ---
 st.markdown("""
     <style>
-    .main-title { font-size: 2.5rem !important; font-weight: 900 !important; color: #ffffff; text-align: center; text-shadow: 2px 2px 4px #000; margin-bottom: 5px; }
-    .teacher-name { text-align: center; font-size: 1rem; color: #ffffff; margin-bottom: 25px; opacity: 0.9; }
-    .business-name { color: #2ecc71; font-weight: bold; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
     
-    /* නවීකරණය කරන ලද කුඩා විෂය කොටු (Small & Elegant Subject Cards) */
-    .subject-container { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 20px; }
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+
+    .main-title { font-size: 3rem !important; font-weight: 900 !important; color: #00FF88; text-align: center; text-shadow: 2px 2px 10px rgba(0,255,136,0.3); margin-bottom: 0px; }
+    .teacher-name { text-align: center; font-size: 1.1rem; color: #ffffff; margin-bottom: 30px; letter-spacing: 1px; }
+    
+    /* කැපී පෙනෙන නවීන විෂය කොටු (High Contrast Cards) */
+    .subject-container { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 25px; }
     .subject-card { 
-        background: white; 
-        padding: 12px; 
-        border-radius: 10px; 
-        border-top: 5px solid #2ecc71; 
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        background: #1E1E1E; 
+        padding: 20px; 
+        border-radius: 15px; 
+        border: 1px solid #333;
+        border-top: 4px solid #00FF88; 
+        box-shadow: 0 10px 20px rgba(0,0,0,0.3); 
         flex: 1; 
         text-align: center;
     }
-    .sub-label { color: #888; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; margin-bottom: 2px; }
-    .sub-name { color: #333; font-size: 0.95rem; font-weight: bold; display: block; margin-bottom: 5px; line-height: 1.2; }
-    .sub-value { color: #2ecc71; font-size: 1.4rem; font-weight: 900; }
+    .sub-label { color: #888; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .sub-name { color: #ffffff; font-size: 1.2rem; font-weight: 700; display: block; margin-bottom: 8px; }
+    .sub-value { color: #00FF88; font-size: 2.2rem; font-weight: 900; }
 
-    /* Feedback Box Customization */
-    .feedback-box { padding: 12px; border-radius: 10px; text-align: center; font-size: 1.1rem; font-weight: bold; margin-bottom: 20px; border: 2px solid; }
+    /* Feedback Box */
+    .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.3rem; font-weight: bold; margin-bottom: 25px; border: 2px solid; }
     
-    /* Input Form Styling */
-    [data-testid="stMetricValue"] { color: #000000 !important; font-size: 1.8rem !important; }
-    div[data-testid="stMetric"] { background-color: #ffffff; padding: 10px; border-radius: 10px; border: 1px solid #eee; }
+    /* Sidebar Input Fix */
+    .stNumberInput label, .stSelectbox label { color: #ffffff !important; font-weight: bold !important; font-size: 1rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -94,12 +97,11 @@ with st.sidebar:
         if st.button("Log Out"):
             st.session_state.logged_in = False; st.rerun()
 
-# --- Main Logic ---
+# --- Main logic ---
 if st.session_state.logged_in:
-    st.markdown('<p class="main-title">🎓 A/L Smart Study Tracker Pro</p>', unsafe_allow_html=True)
-    st.markdown('<div class="teacher-name">Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class="business-name">Hiratrix IT Solutions</span></div>', unsafe_allow_html=True)
-    st.divider()
-
+    st.markdown('<p class="main-title">A/L STUDY TRACKER PRO</p>', unsafe_allow_html=True)
+    st.markdown('<div class="teacher-name">Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span style="color:#00FF88">Hiratrix IT Solutions</span></div>', unsafe_allow_html=True)
+    
     conn = sqlite3.connect('alevel_tracker_final.db')
     pref = conn.execute("SELECT * FROM user_prefs WHERE username=?", (st.session_state.username,)).fetchone()
     
@@ -119,12 +121,12 @@ if st.session_state.logged_in:
             conn.commit(); st.rerun()
 
         st.divider()
-        st.subheader("📝 දත්ත ඇතුළත් කරන්න")
+        st.subheader("📝 දත්ත ඇතුළත් කිරීම")
         sel_date = st.date_input("දිනය", datetime.now())
         
         hrs_input = []
         for i in range(1, 4):
-            st.write(f"📌 **{selected_subs[i-1]}**")
+            st.write(f"**{selected_subs[i-1]}**")
             c1, c2 = st.columns(2)
             h = c1.number_input("පැය", 0, 24, key=f"h_in_{i}")
             m = c2.number_input("මිනිත්තු", 0, 59, key=f"m_in_{i}")
@@ -148,7 +150,7 @@ if st.session_state.logged_in:
             conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
             conn.commit(); st.rerun()
 
-    # --- Analytics Tabs ---
+    # --- Analytics ---
     tab1, tab2 = st.tabs(["📊 වර්තමාන සතිය", "🔍 පැරණි වාර්තා"])
 
     def display_analytics(start_date):
@@ -161,26 +163,18 @@ if st.session_state.logged_in:
                 total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
                 
                 # Feedback Box
-                f_bg = "#e8f5e9" if total_h >= 40 else "#ffebee"
-                f_txt = "#2e7d32" if total_h >= 40 else "#c62828"
-                msg = "🔥 විශිෂ්ටයි! දිගටම කරගෙන යන්න." if total_h >= 40 else "⚠️ අවධානය දෙන්න! තව මහන්සි වෙන්න අවශ්‍යයි."
-                st.markdown(f'<div class="feedback-box" style="background-color: {f_bg}; color: {f_txt}; border-color: {f_txt};">{msg} (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
+                f_bg = "rgba(0, 255, 136, 0.1)" if total_h >= 40 else "rgba(255, 68, 68, 0.1)"
+                f_txt = "#00FF88" if total_h >= 40 else "#FF4444"
+                msg = "🔥 නියමයි! දිගටම කරගෙන යන්න." if total_h >= 40 else "⚠️ අවධානය දෙන්න! තව මහන්සි වෙන්න."
+                st.markdown(f'<div class="feedback-box" style="background-color: {f_bg}; color: {f_txt}; border-color: {f_txt};">{msg} (සතියේ පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
                 
-                # Top Metrics
-                m1, m2, m3 = st.columns(3)
-                m1.metric("📅 සතියේ මුළු පැය", f"{total_h:.1f} h")
-                m2.metric("📊 දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
-                m3.metric("✅ සටහන් කළ දින", f"{len(week_df)}/7")
-                
-                st.write("")
-                # නවීකරණය කරන ලද කුඩා විෂය කොටු 3
-                st.markdown("### 📚 විෂයන් අනුව ප්‍රගතිය")
+                # High Contrast Subject Cards
                 cols = st.columns(3)
                 for i in range(3):
                     val = week_df[f'sub{i+1}_h'].sum()
                     cols[i].markdown(f"""
                         <div class="subject-card">
-                            <div class="sub-label">SUBJECT {i+1}</div>
+                            <div class="sub-label">SUBJECT 0{i+1}</div>
                             <div class="sub-name">{selected_subs[i]}</div>
                             <div class="sub-value">{val:.1f} h</div>
                         </div>
@@ -188,12 +182,16 @@ if st.session_state.logged_in:
 
                 # Graph
                 st.markdown("### 📈 ප්‍රගති ප්‍රස්ථාරය")
-                fig, ax = plt.subplots(figsize=(10, 4))
-                ax.bar(week_df['date'].astype(str), week_df['sub1_h'], label=selected_subs[0], color='#2ecc71')
-                ax.bar(week_df['date'].astype(str), week_df['sub2_h'], bottom=week_df['sub1_h'], label=selected_subs[1], color='#3498db')
-                ax.bar(week_df['date'].astype(str), week_df['sub3_h'], bottom=week_df['sub1_h']+week_df['sub2_h'], label=selected_subs[2], color='#e67e22')
+                fig, ax = plt.subplots(figsize=(10, 4), facecolor='#0E1117')
+                ax.set_facecolor('#1E1E1E')
+                ax.bar(week_df['date'].astype(str), week_df['sub1_h'], label=selected_subs[0], color='#00FF88')
+                ax.bar(week_df['date'].astype(str), week_df['sub2_h'], bottom=week_df['sub1_h'], label=selected_subs[1], color='#00D1FF')
+                ax.bar(week_df['date'].astype(str), week_df['sub3_h'], bottom=week_df['sub1_h']+week_df['sub2_h'], label=selected_subs[2], color='#FFD600')
+                ax.tick_params(colors='white')
+                ax.spines['bottom'].set_color('white')
+                ax.spines['left'].set_color('white')
                 plt.xticks(rotation=45); ax.legend(); st.pyplot(fig)
-            else: st.info("දත්ත කිසිවක් නැත.")
+            else: st.info("දත්ත නැත.")
         else: st.warning("දත්ත ඇතුළත් කර නැත.")
 
     with tab1:
@@ -204,5 +202,3 @@ if st.session_state.logged_in:
         display_analytics(hist_date)
 
     conn.close()
-else:
-    st.info("Sidebar එක භාවිතා කර ඇතුළු වන්න.")
