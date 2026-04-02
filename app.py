@@ -10,7 +10,6 @@ def init_db():
     with sqlite3.connect('alevel_tracker_final.db') as conn:
         cursor = conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
-        # විෂයයන් මතක තබා ගැනීමට නව Table එකක්
         cursor.execute('''CREATE TABLE IF NOT EXISTS user_preferences 
                           (username TEXT PRIMARY KEY, stream TEXT, sub1 TEXT, sub2 TEXT, sub3 TEXT)''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS study_logs 
@@ -53,7 +52,6 @@ if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 st.sidebar.title("🔐 Access Control")
 
 if not st.session_state.logged_in:
-    # ලොග් වී නැතිනම් පමණක් Login/Sign Up පෙන්වයි
     auth_mode = st.sidebar.selectbox("තෝරන්න", ["Login", "Sign Up"])
     u_in = st.sidebar.text_input("Username")
     p_in = st.sidebar.text_input("Password", type='password')
@@ -75,7 +73,6 @@ if not st.session_state.logged_in:
                     st.rerun()
                 else: st.sidebar.error("නම හෝ මුරපදය වැරදියි.")
 else:
-    # ලොග් වූ පසු Login කොටස ඉවත් කර Log Out පමණක් පෙන්වයි
     st.sidebar.success(f"පරිශීලක: {st.session_state.username}")
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False
@@ -87,11 +84,9 @@ if st.session_state.logged_in:
     st.markdown(f"<div style='text-align: center;'>Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class='business-name'>Hiratrix IT Solutions</span></div>", unsafe_allow_html=True)
     st.divider()
 
-    # පරිශීලකයාගේ විෂයයන් Database එකෙන් ලබා ගැනීම
     with sqlite3.connect('alevel_tracker_final.db') as conn:
         pref = conn.execute('SELECT stream, sub1, sub2, sub3 FROM user_preferences WHERE username=?', (st.session_state.username,)).fetchone()
 
-    # විෂයයන් තවම තෝරා නැතිනම් පමණක් තේරීමට ඉඩ දෙයි
     if not pref:
         st.warning("පළමුව ඔබගේ විෂය ධාරාව සහ විෂයයන් තෝරා සුරකින්න.")
         with st.expander("🎓 විෂයයන් සැකසීම", expanded=True):
@@ -106,14 +101,13 @@ if st.session_state.logged_in:
                     conn.commit()
                 st.rerun()
     else:
-        # මතක තබා ගත් විෂයයන් භාවිතය
         user_stream, user_sub1, user_sub2, user_sub3 = pref
         
         # Sidebar Data Entry
         st.sidebar.divider()
         st.sidebar.subheader("📝 අද දත්ත ඇතුළත් කිරීම")
         st.sidebar.info(f"විෂය ධාරාව: {user_stream}")
-        entry_date = st.sidebar.date_input("දිනය", datetime.now())
+        entry_date = st.sidebar.date_input("දිනය", datetime.now(), key="main_entry_date")
         
         hours_input = []
         for s_name in [user_sub1, user_sub2, user_sub3]:
@@ -128,7 +122,6 @@ if st.session_state.logged_in:
                 conn.execute('''INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET 
                                 sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h''', 
                              (st.session_state.username, str(entry_date), user_stream, user_sub1, hours_input[0], user_sub2, hours_input[1], user_sub3, hours_input[2]))
-            st.sidebar.success("දත්ත සුරැකුණා!")
             st.rerun()
 
         # Tabs for Display
@@ -168,16 +161,38 @@ if st.session_state.logged_in:
             else: st.info("දත්ත ඇතුළත් කළ පසු මෙහි දිස්වනු ඇත.")
 
         with tab1:
-            main_start = st.date_input("ප්‍රස්ථාරය සඳහා ආරම්භක දිනය", datetime.now() - timedelta(days=6))
+            main_start = st.date_input("ප්‍රස්ථාරය සඳහා ආරම්භක දිනය", datetime.now() - timedelta(days=6), key="tab1_start")
             show_stats(main_start)
 
         with tab2:
-            old_start = st.date_input("පැරණි වාර්තා සඳහා දිනය තෝරන්න", datetime.now() - timedelta(days=14))
+            old_start = st.date_input("පැරණි වාර්තා සඳහා දිනය තෝරන්න", datetime.now() - timedelta(days=14), key="tab2_start")
             show_stats(old_start)
 
-        # Settings to change subjects
+        # --- 🗑️ දත්ත කළමනාකරණය (DELETE BUTTONS) ---
+        st.sidebar.divider()
+        st.sidebar.subheader("🗑️ දත්ත කළමනාකරණය")
+        
+        if st.sidebar.button("අද දවසේ දත්ත මකන්න"):
+            with sqlite3.connect('alevel_tracker_final.db') as conn:
+                conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date='{entry_date}'")
+            st.sidebar.warning(f"{entry_date} දත්ත මැකුණා!")
+            st.rerun()
+
+        if st.sidebar.button("මේ සතියේ දත්ත මකන්න"):
+            # Tab 1 හි පෙන්වන සතියේ දත්ත මකයි
+            w_start, w_end = str(main_start), str(main_start + timedelta(days=6))
+            with sqlite3.connect('alevel_tracker_final.db') as conn:
+                conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date BETWEEN '{w_start}' AND '{w_end}'")
+            st.sidebar.warning("තෝරාගත් සතියේ දත්ත මැකුණා!")
+            st.rerun()
+
+        if st.sidebar.button("සියලු දත්ත මකා දමන්න"):
+            with sqlite3.connect('alevel_tracker_final.db') as conn:
+                conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
+            st.sidebar.error("ඔබගේ සියලු දත්ත මැකී ගියා!")
+            st.rerun()
+
         with st.sidebar.expander("⚙️ විෂයයන් වෙනස් කිරීමට"):
-            st.warning("විෂයයන් වෙනස් කළහොත් පෙර දත්තවල විෂය නාමයන් සමඟ ගැටලු ඇති විය හැක.")
             if st.button("විෂය සැකසුම් Reset කරන්න"):
                 with sqlite3.connect('alevel_tracker_final.db') as conn:
                     conn.execute('DELETE FROM user_preferences WHERE username=?', (st.session_state.username,))
