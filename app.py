@@ -11,7 +11,6 @@ def init_db():
     with sqlite3.connect('alevel_tracker_final.db') as conn:
         cursor = conn.cursor()
         cursor.execute('''CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password TEXT)''')
-        # විෂයන් ස්ථිරව තබා ගැනීමට නව වගුවක්
         cursor.execute('''CREATE TABLE IF NOT EXISTS user_prefs 
                           (username TEXT PRIMARY KEY, stream TEXT, sub1 TEXT, sub2 TEXT, sub3 TEXT)''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS study_logs 
@@ -32,10 +31,19 @@ st.set_page_config(page_title="A/L Study Tracker Pro", layout="wide")
 # --- UI Styles (CSS) ---
 st.markdown("""
     <style>
-    .main-title { font-size: 2.8rem !important; font-weight: 900 !important; color: #ffffff; text-align: center; margin-bottom: 10px; }
-    div[data-testid="stMetric"] { background-color: #ffffff !important; padding: 15px; border-radius: 12px; border: 1px solid #ddd; }
-    .subject-card { background-color: #ffffff; padding: 15px; border-radius: 12px; border-left: 10px solid #2ecc71; color: #000; text-align: center; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .feedback-box { padding: 18px; border-radius: 12px; text-align: center; font-size: 1.2rem; font-weight: bold; margin: 20px 0; border: 2px solid; }
+    .main-title { font-size: 2.8rem !important; font-weight: 900 !important; color: #ffffff; text-align: center; text-shadow: 2px 2px 4px #000; margin-bottom: 5px; }
+    .teacher-name { text-align: center; font-size: 1.1rem; color: #ffffff; margin-bottom: 20px; }
+    .business-name { color: #2ecc71; font-weight: bold; }
+    /* පැහැදිලිව පෙනෙන සුදු කොටු (Subject Cards) */
+    .subject-card { background-color: #ffffff; padding: 20px; border-radius: 12px; border-left: 10px solid #2ecc71; margin-bottom: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); text-align: center; }
+    .sub-title { color: #555555; font-size: 0.9rem; font-weight: bold; text-transform: uppercase; }
+    .sub-value { color: #000000; font-size: 1.8rem; font-weight: 900; margin-top: 5px; }
+    .sub-name { color: #2ecc71; font-size: 1.1rem; font-weight: bold; }
+    /* Feedback Box */
+    .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.2rem; font-weight: bold; margin: 20px 0; border: 2px solid; }
+    /* Metrics Fix */
+    [data-testid="stMetricValue"] { color: #000000 !important; font-weight: bold !important; }
+    div[data-testid="stMetric"] { background-color: #ffffff; padding: 15px; border-radius: 12px; border: 1px solid #ddd; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -60,7 +68,7 @@ if not st.session_state.logged_in:
             if auth_mode == "Register":
                 try:
                     conn.execute("INSERT INTO users VALUES (?, ?)", (u_in, make_hashes(p_in)))
-                    conn.commit(); st.sidebar.success("දැන් Login වන්න.")
+                    conn.commit(); st.sidebar.success("සාර්ථකයි! දැන් Login වන්න.")
                 except: st.sidebar.error("නම දැනටමත් ඇත.")
             else:
                 data = conn.execute('SELECT password FROM users WHERE username =?', (u_in,)).fetchone()
@@ -73,43 +81,42 @@ else:
     if st.sidebar.button("Log Out"):
         st.session_state.logged_in = False; st.rerun()
 
-# --- Main App ---
+# --- Main Application ---
 if st.session_state.logged_in:
+    # Header with Teacher's Name
     st.markdown('<p class="main-title">🎓 A/L Smart Study Tracker Pro</p>', unsafe_allow_html=True)
-    st.markdown("<div style='text-align: center;'>Developed by: <b style='color: #2ecc71;'>Hiratrix IT Solutions</b></div>", unsafe_allow_html=True)
+    st.markdown('<div class="teacher-name">Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class="business-name">Hiratrix IT Solutions</span></div>', unsafe_allow_html=True)
     st.divider()
 
     conn = sqlite3.connect('alevel_tracker_final.db')
     
-    # 1. පෙර තේරූ විෂයන් දත්ත ගබඩාවෙන් ලබා ගැනීම
+    # විෂය සැකසුම් ලබා ගැනීම
     pref = conn.execute("SELECT * FROM user_prefs WHERE username=?", (st.session_state.username,)).fetchone()
     
     with st.sidebar:
         st.subheader("⚙️ විෂය සැකසුම්")
-        # විෂය ධාරාව එකවරක් ඇතුළත් කළ පසු වෙනස් කිරීමට අවශ්‍ය නම් පමණක් පෙන්වයි
         current_stream = pref[1] if pref else list(SUBJECTS_DATA.keys())[0]
         stream = st.selectbox("විෂය ධාරාව", list(SUBJECTS_DATA.keys()), index=list(SUBJECTS_DATA.keys()).index(current_stream))
         
         selected_subs = []
         for i in range(1, 4):
             default_sub = pref[i+1] if pref and pref[i+1] in SUBJECTS_DATA[stream] else SUBJECTS_DATA[stream][i-1]
-            s = st.selectbox(f"විෂය {i}", SUBJECTS_DATA[stream], index=SUBJECTS_DATA[stream].index(default_sub), key=f"sel_sub_{i}")
+            s = st.selectbox(f"විෂය {i}", SUBJECTS_DATA[stream], index=SUBJECTS_DATA[stream].index(default_sub), key=f"fix_sub_{i}")
             selected_subs.append(s)
             
-        if st.button("විෂයන් ස්ථිර කරන්න (Fix Subjects)"):
-            conn.execute("INSERT OR REPLACE INTO user_prefs VALUES (?,?,?,?,?)", 
-                         (st.session_state.username, stream, selected_subs[0], selected_subs[1], selected_subs[2]))
-            conn.commit(); st.success("සැකසුම් සුරැකුණා!"); st.rerun()
+        if st.button("විෂයන් ස්ථිර කරන්න"):
+            conn.execute("INSERT OR REPLACE INTO user_prefs VALUES (?,?,?,?,?)", (st.session_state.username, stream, selected_subs[0], selected_subs[1], selected_subs[2]))
+            conn.commit(); st.rerun()
 
         st.divider()
-        st.subheader("📝 අද දින දත්ත")
+        st.subheader("📝 දත්ත ඇතුළත් කරන්න")
         sel_date = st.date_input("දිනය", datetime.now())
         
         hrs_input = []
         for i in range(1, 4):
             st.write(f"**{selected_subs[i-1]}**")
             c1, c2 = st.columns(2)
-            # Reset වීමේදී Error එක මගහැරීමට value එක කෙලින්ම ලබා නොදී key භාවිතා කරයි
+            # ERROR එක වැලැක්වීමට කෙලින්ම session_state වෙනස් නොකර Widget එකේ value එක පාලනය කරයි
             h = c1.number_input("පැය", 0, 24, key=f"h_in_{i}")
             m = c2.number_input("මිනිත්තු", 0, 59, key=f"m_in_{i}")
             hrs_input.append(h + (m/60))
@@ -118,21 +125,28 @@ if st.session_state.logged_in:
             conn.execute('INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h', 
                          (st.session_state.username, str(sel_date), stream, selected_subs[0], hrs_input[0], selected_subs[1], hrs_input[1], selected_subs[2], hrs_input[2]))
             conn.commit()
-            # Input Reset කිරීම (Session state හරහා බිංදු කිරීම)
-            for i in range(1, 4):
-                st.session_state[f"h_in_{i}"] = 0
-                st.session_state[f"m_in_{i}"] = 0
+            st.success("දත්ත සුරැකුණා!")
+            # Reset values by rerunning without direct state assignment to avoid API Exception
             st.rerun()
 
-        st.sidebar.subheader("🗑️ දත්ත මකන්න")
-        if st.sidebar.button("සියලුම දත්ත මකන්න"):
+        # දත්ත මකන බොත්තම් 3 (Delete Buttons)
+        st.sidebar.divider()
+        st.sidebar.subheader("🗑️ දත්ත කළමනාකරණය")
+        if st.sidebar.button("🗑️ අද දත්ත මකන්න"):
+            conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date='{sel_date}'")
+            conn.commit(); st.rerun()
+        if st.sidebar.button("🚨 සතියේ දත්ත මකන්න"):
+            w_start = sel_date - timedelta(days=sel_date.weekday())
+            conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date >= '{w_start}'")
+            conn.commit(); st.rerun()
+        if st.sidebar.button("🔥 සියලුම දත්ත මකන්න"):
             conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
             conn.commit(); st.rerun()
 
-    # --- Display Area ---
-    tab1, tab2 = st.tabs(["📊 වර්තමාන ප්‍රගතිය", "🔍 පැරණි වාර්තා"])
-    
-    def render_stats(start_date):
+    # --- Analytics Tabs ---
+    tab1, tab2 = st.tabs(["📊 වර්තමාන සතිය", "🔍 පැරණි වාර්තා"])
+
+    def display_data(start_date):
         end_date = start_date + timedelta(days=6)
         df = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username='{st.session_state.username}'", conn)
         if not df.empty:
@@ -141,40 +155,51 @@ if st.session_state.logged_in:
             
             if not week_df.empty:
                 total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
-                # Feedback
-                color = "#e8f5e9" if total_h >= 40 else "#ffebee"
-                text_color = "#2e7d32" if total_h >= 40 else "#c62828"
-                msg = "🎉 නියමයි! හොඳ ප්‍රගතියක්." if total_h >= 40 else "😟 තව මහන්සි වෙන්න!"
-                st.markdown(f'<div class="feedback-box" style="background-color: {color}; color: {text_color}; border-color: {text_color};">{msg} (සතියේ පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
                 
-                # Metrics
+                # Feedback Box
+                f_color = "#e8f5e9" if total_h >= 40 else "#ffebee"
+                t_color = "#2e7d32" if total_h >= 40 else "#c62828"
+                msg = "🎉 නියමයි! සාර්ථකයි." if total_h >= 40 else "😟 ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව මහන්සි වෙන්න!"
+                st.markdown(f'<div class="feedback-box" style="background-color: {f_color}; color: {t_color}; border-color: {t_color};">{msg} (සතියේ පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
+                
+                # Top Metrics
                 m1, m2, m3 = st.columns(3)
-                m1.metric("📅 මුළු පැය", f"{total_h:.1f} h")
-                m2.metric("📊 සාමාන්‍යය", f"{(total_h/7):.1f} h")
-                m3.metric("✅ දින", f"{len(week_df)} / 7")
+                m1.metric("📅 සතියේ මුළු පැය", f"{total_h:.1f} h")
+                m2.metric("📊 දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
+                m3.metric("✅ සටහන් කළ දින", f"{len(week_df)} / 7")
                 
-                # Subject Cards
-                st.markdown("### 📚 විෂයන් අනුව පැය")
-                sc = st.columns(3)
+                # Subject Cards (පැහැදිලිව පෙනෙන සුදු කොටු 3)
+                st.markdown("### 📚 විෂයන් අනුව ප්‍රගතිය")
+                sc1, sc2, sc3 = st.columns(3)
+                cards = [sc1, sc2, sc3]
                 for i in range(3):
-                    val = week_df[f'sub{i+1}_h'].sum()
-                    sc[i].markdown(f"<div class='subject-card'><small>{selected_subs[i]}</small><br><span style='font-size: 1.5rem;'>{val:.1f} h</span></div>", unsafe_allow_html=True)
-                
+                    sum_h = week_df[f'sub{i+1}_h'].sum()
+                    cards[i].markdown(f"""
+                        <div class="subject-card">
+                            <div class="sub-title">විෂය</div>
+                            <div class="sub-name">{selected_subs[i]}</div>
+                            <div class="sub-value">{sum_h:.1f} h</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
                 # Graph
-                st.markdown("### 📈 ප්‍රස්ථාරය")
+                st.markdown("### 📈 ප්‍රගති ප්‍රස්ථාරය")
                 fig, ax = plt.subplots(figsize=(10, 4))
-                ax.bar(week_df['date'].astype(str), week_df['sub1_h'], label=selected_subs[0])
-                ax.bar(week_df['date'].astype(str), week_df['sub2_h'], bottom=week_df['sub1_h'], label=selected_subs[1])
-                ax.bar(week_df['date'].astype(str), week_df['sub3_h'], bottom=week_df['sub1_h']+week_df['sub2_h'], label=selected_subs[2])
+                ax.bar(week_df['date'].astype(str), week_df['sub1_h'], label=selected_subs[0], color='#2ecc71')
+                ax.bar(week_df['date'].astype(str), week_df['sub2_h'], bottom=week_df['sub1_h'], label=selected_subs[1], color='#3498db')
+                ax.bar(week_df['date'].astype(str), week_df['sub3_h'], bottom=week_df['sub1_h']+week_df['sub2_h'], label=selected_subs[2], color='#e67e22')
                 plt.xticks(rotation=45); ax.legend(); st.pyplot(fig)
-            else: st.info("දත්ත නැත.")
+            else: st.info("මෙම සතිය සඳහා දත්ත ඇතුළත් කර නැත.")
+        else: st.warning("තවමත් කිසිදු දත්තයක් සටහන් කර නැත.")
 
     with tab1:
-        w_start = datetime.now().date() - timedelta(days=datetime.now().weekday())
-        render_stats(w_start)
+        current_w_start = datetime.now().date() - timedelta(days=datetime.now().weekday())
+        display_data(current_w_start)
         
     with tab2:
-        h_date = st.date_input("සතියේ ආරම්භය", w_start - timedelta(days=7))
-        render_stats(h_date)
+        search_date = st.date_input("සතිය ආරම්භ වන දිනය තෝරන්න", current_w_start - timedelta(days=7))
+        display_data(search_date)
 
     conn.close()
+else:
+    st.info("Sidebar එක භාවිතා කර Login වන්න.")
