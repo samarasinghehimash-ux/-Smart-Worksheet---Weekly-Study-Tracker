@@ -35,9 +35,7 @@ st.markdown("""
     div[data-testid="stMetric"] { background-color: #ffffff !important; padding: 15px; border-radius: 12px; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     .subject-card { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; color: #000000 !important; margin-bottom: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .business-name { color: #2ecc71 !important; font-weight: bold; font-size: 1.2rem; }
-    
-    /* Feedback Box එක සඳහා පරතරය (Margin-bottom) */
-    .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.3rem; font-weight: bold; margin-top: 20px; margin-bottom: 40px; border: 2px solid; }
+    .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.3rem; font-weight: bold; margin-top: 20px; margin-bottom: 50px; border: 2px solid; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -52,9 +50,11 @@ SUBJECTS_DATA = {
 
 # Session State Initialize
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-for i in range(3):
-    if f'h{i}' not in st.session_state: st.session_state[f'h{i}'] = 0
-    if f'm{i}' not in st.session_state: st.session_state[f'm{i}'] = 0
+# පසුව භාවිතය සඳහා පැය/මිනිත්තු අගයන් Reset කරන Function එක
+def reset_inputs():
+    for i in range(3):
+        st.session_state[f'h{i}'] = 0
+        st.session_state[f'm{i}'] = 0
 
 # --- Sidebar Login/Register ---
 st.sidebar.title("🔐 Access Control")
@@ -95,7 +95,6 @@ def display_full_analytics(df, start_date):
     if not week_df.empty:
         total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
         
-        # Feedback Box with increased margin
         if total_h < 40:
             st.markdown(f'<div class="feedback-box" style="background-color: #ffebee; color: #c62828; border-color: #ef9a9a;">😟 ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව ගොඩක් මහන්සි වෙන්න! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
         elif total_h < 60:
@@ -131,7 +130,7 @@ def display_full_analytics(df, start_date):
 
 # --- Main App ---
 if st.session_state.logged_in:
-    st.markdown('<p class="main-title">🎓 A/L Study Tracker Pro</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-title">🎓 A/L Smart Study Tracker Pro</p>', unsafe_allow_html=True)
     st.markdown("<div style='text-align: center;'>Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class='business-name'>Hiratrix IT Solutions</span></div>", unsafe_allow_html=True)
     st.divider()
 
@@ -153,25 +152,31 @@ if st.session_state.logged_in:
         with tab1:
             st.sidebar.subheader("📝 දත්ත සටහන් කරන්න")
             e_date = st.sidebar.date_input("දිනය", datetime.now())
-            stream = st.sidebar.selectbox("ධාරාව", list(SUBJECTS_DATA.keys()))
+            
+            # ධාරාව සහ විෂයන් මතක තබා ගැනීම (Persistent)
+            stream = st.sidebar.selectbox("ධාරාව", list(SUBJECTS_DATA.keys()), key="user_stream")
+            
             names, hrs = [], []
             for i in range(3):
                 st.sidebar.write(f"--- විෂය {i+1} ---")
-                n = st.sidebar.selectbox(f"විෂය {i+1}", SUBJECTS_DATA[stream], key=f"n{i}", index=i)
+                n = st.sidebar.selectbox(f"විෂය {i+1}", SUBJECTS_DATA[stream], key=f"sel_n{i}", index=i)
+                
                 c1, c2 = st.sidebar.columns(2)
-                # Input with Session State to Reset
+                # අගයන් බින්දුව කිරීමට session_state භාවිතා කරන නමුත් ඍජුවම mutate නොකරයි
                 h = c1.number_input("පැය", 0, 24, key=f"h{i}")
                 m = c2.number_input("මිනිත්තු", 0, 59, key=f"m{i}")
+                
                 names.append(n); hrs.append(h + (m/60))
             
+            # දත්ත සුරැකීමේ බොත්තම
             if st.sidebar.button("දත්ත සුරකින්න (SAVE)"):
-                conn.execute('INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h', 
-                             (st.session_state.username, str(e_date), stream, names[0], hrs[0], names[1], hrs[1], names[2], hrs[2]))
-                conn.commit()
-                # Reset Inputs to Zero
-                for i in range(3):
-                    st.session_state[f'h{i}'] = 0
-                    st.session_state[f'm{i}'] = 0
+                with sqlite3.connect('alevel_tracker_final.db') as db_conn:
+                    db_conn.execute('INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h', 
+                                 (st.session_state.username, str(e_date), stream, names[0], hrs[0], names[1], hrs[1], names[2], hrs[2]))
+                    db_conn.commit()
+                
+                # අගයන් බින්දුව කිරීම සඳහා callback එකක් වෙනුවට session_state ඍජුවම යාවත්කාලීන කිරීම
+                reset_inputs()
                 st.rerun()
 
             # Delete Buttons
