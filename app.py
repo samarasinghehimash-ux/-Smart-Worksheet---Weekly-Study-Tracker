@@ -28,35 +28,46 @@ init_db()
 # --- Page Config ---
 st.set_page_config(page_title="A/L Study Tracker Pro", layout="wide")
 
-# --- UI Styles (Light Theme - කලින් තිබූ පෙනුම) ---
+# --- UI Styles (කලින් තිබූ සාර්ථක පෙනුම නැවත ලබා ගැනීම) ---
 st.markdown("""
     <style>
-    /* මුළු පිටුවේම පසුබිම සහ අකුරු */
-    .stApp { background-color: #f8f9fa; }
+    /* පිරිසිදු සුදු පසුබිම */
+    .stApp { background-color: #FFFFFF !important; }
     
-    .main-title { font-size: 2.8rem !important; font-weight: 900 !important; color: #2c3e50; text-align: center; margin-bottom: 5px; }
-    .teacher-name { text-align: center; font-size: 1.1rem; color: #555; margin-bottom: 30px; }
-    .business-name { color: #27ae60; font-weight: bold; }
+    .main-title { font-size: 2.8rem !important; font-weight: 800 !important; color: #1e272e; text-align: center; margin-bottom: 2px; }
+    .teacher-name { text-align: center; font-size: 1rem; color: #485460; margin-bottom: 25px; }
+    .business-name { color: #05c46b; font-weight: bold; }
     
-    /* නිල් පාටින් කැපී පෙනෙන විෂය කොටු */
-    .subject-card { 
-        background: white; 
-        padding: 20px; 
-        border-radius: 12px; 
-        border-left: 8px solid #3498db; 
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
-        text-align: center;
-        margin-bottom: 10px;
+    /* Metrics (කොටු 3) */
+    [data-testid="stMetric"] {
+        background-color: #f1f2f6;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #dfe4ea;
     }
-    .sub-label { color: #7f8c8d; font-size: 0.85rem; font-weight: bold; text-transform: uppercase; }
-    .sub-name { color: #2c3e50; font-size: 1.1rem; font-weight: bold; margin: 5px 0; }
-    .sub-value { color: #3498db; font-size: 2rem; font-weight: 900; }
+    [data-testid="stMetricValue"] { color: #2f3542 !important; font-size: 1.8rem !important; }
+    [data-testid="stMetricLabel"] { color: #57606f !important; font-weight: bold !important; }
+
+    /* විෂය ප්‍රගති කොටු (Compact Subject Cards) */
+    .subject-card { 
+        background: #ffffff; 
+        padding: 15px; 
+        border-radius: 12px; 
+        border-top: 5px solid #3498db; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+        text-align: center;
+        border: 1px solid #eee;
+    }
+    .sub-label { color: #7f8c8d; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; }
+    .sub-name { color: #2c3e50; font-size: 1rem; font-weight: bold; margin: 5px 0; display: block; }
+    .sub-value { color: #3498db; font-size: 1.6rem; font-weight: 800; }
 
     /* Feedback Box */
-    .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.2rem; font-weight: bold; margin-bottom: 25px; border: 2px solid; }
+    .feedback-box { padding: 15px; border-radius: 10px; text-align: center; font-size: 1.1rem; font-weight: bold; margin-bottom: 20px; border: 2px solid; }
     
-    /* Sidebar අකුරු */
-    .css-163ttbj { color: #2c3e50 !important; }
+    /* Tabs & Text Fix */
+    .stTabs [data-baseweb="tab"] { font-size: 1rem; font-weight: bold; color: #2f3542; }
+    h3 { color: #2f3542 !important; font-size: 1.4rem !important; margin-top: 20px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -82,20 +93,20 @@ with st.sidebar:
                 if auth_mode == "Register":
                     try:
                         conn.execute("INSERT INTO users VALUES (?, ?)", (u_in, make_hashes(p_in)))
-                        conn.commit(); st.success("සාර්ථකයි! දැන් Login වන්න.")
+                        conn.commit(); st.success("සාර්ථකයි! Login වන්න.")
                     except: st.error("නම දැනටමත් ඇත.")
                 else:
                     data = conn.execute('SELECT password FROM users WHERE username =?', (u_in,)).fetchone()
                     if data and check_hashes(p_in, data[0]):
                         st.session_state.logged_in, st.session_state.username = True, u_in
                         st.rerun()
-                    else: st.sidebar.error("දත්ත වැරදියි.")
+                    else: st.error("දත්ත වැරදියි.")
     else:
         st.success(f"පරිශීලක: {st.session_state.username}")
         if st.button("Log Out"):
             st.session_state.logged_in = False; st.rerun()
 
-# --- Main App ---
+# --- Main Interface ---
 if st.session_state.logged_in:
     st.markdown('<p class="main-title">🎓 A/L Study Tracker Pro</p>', unsafe_allow_html=True)
     st.markdown('<div class="teacher-name">Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class="business-name">Hiratrix IT Solutions</span></div>', unsafe_allow_html=True)
@@ -148,10 +159,10 @@ if st.session_state.logged_in:
             conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
             conn.commit(); st.rerun()
 
-    # --- Tabs ---
+    # --- Analytics Tabs ---
     tab1, tab2 = st.tabs(["📊 වර්තමාන සතිය", "🔍 පැරණි වාර්තා"])
 
-    def display_data(start_date):
+    def display_analytics(start_date):
         df = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username='{st.session_state.username}'", conn)
         if not df.empty:
             df['date'] = pd.to_datetime(df['date']).dt.date
@@ -160,37 +171,37 @@ if st.session_state.logged_in:
             if not week_df.empty:
                 total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
                 
-                # Feedback Box (කලින් තිබූ වර්ණ)
+                # Feedback Box
                 f_bg = "#d4edda" if total_h >= 40 else "#f8d7da"
                 f_txt = "#155724" if total_h >= 40 else "#721c24"
-                msg = "🎉 නියමයි! සාර්ථකයි." if total_h >= 40 else "😟 ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව මහන්සි වෙන්න!"
-                st.markdown(f'<div class="feedback-box" style="background-color: {f_bg}; color: {f_txt}; border-color: {f_txt};">{msg} (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
+                msg = "🔥 විශිෂ්ටයි! දිගටම කරගෙන යන්න." if total_h >= 40 else "⚠️ ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව මහන්සි වෙන්න!"
+                st.markdown(f'<div class="feedback-box" style="background-color: {f_bg}; color: {f_txt}; border-color: {f_txt};">{msg} (සතියේ පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
                 
-                # Metrics
+                # --- Metrics (අතුරුදහන් වූ කොටු 3) ---
                 m1, m2, m3 = st.columns(3)
                 m1.metric("📅 සතියේ මුළු පැය", f"{total_h:.1f} h")
                 m2.metric("📊 දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
                 m3.metric("✅ සටහන් කළ දින", f"{len(week_df)}/7")
                 
-                # නිල් පාට විෂය කොටු 3
+                # --- විෂය ප්‍රගතිය (කුඩා කොටු) ---
                 st.markdown("### 📚 විෂයන් අනුව ප්‍රගතිය")
                 cols = st.columns(3)
                 for i in range(3):
                     val = week_df[f'sub{i+1}_h'].sum()
                     cols[i].markdown(f"""
                         <div class="subject-card">
-                            <div class="sub-label">විෂය</div>
+                            <div class="sub-label">SUBJECT 0{i+1}</div>
                             <div class="sub-name">{selected_subs[i]}</div>
                             <div class="sub-value">{val:.1f} h</div>
                         </div>
                     """, unsafe_allow_html=True)
 
-                # ප්‍රස්ථාරය නිවැරදි කිරීම (Standard Matplotlib Style)
+                # --- ප්‍රස්ථාරය ---
                 st.markdown("### 📈 ප්‍රගති ප්‍රස්ථාරය")
                 fig, ax = plt.subplots(figsize=(10, 4))
                 ax.bar(week_df['date'].astype(str), week_df['sub1_h'], label=selected_subs[0], color='#2ecc71')
                 ax.bar(week_df['date'].astype(str), week_df['sub2_h'], bottom=week_df['sub1_h'], label=selected_subs[1], color='#3498db')
-                ax.bar(week_df['date'].astype(str), week_df['sub3_h'], bottom=week_df['sub1_h']+week_df['sub2_h'], label=selected_subs[2], color='#e67e22')
+                ax.bar(week_df['date'].astype(str), week_df['sub3_h'], bottom=week_df['sub1_h']+week_df['sub2_h'], label=selected_subs[2], color='#f1c40f')
                 plt.xticks(rotation=45)
                 ax.legend()
                 st.pyplot(fig)
@@ -198,10 +209,10 @@ if st.session_state.logged_in:
         else: st.warning("දත්ත ඇතුළත් කර නැත.")
 
     with tab1:
-        current_w = datetime.now().date() - timedelta(days=datetime.now().weekday())
-        display_data(current_w)
+        cur_w = datetime.now().date() - timedelta(days=datetime.now().weekday())
+        display_analytics(cur_w)
     with tab2:
-        hist_date = st.date_input("සතිය ආරම්භය තෝරන්න", current_w - timedelta(days=7))
-        display_data(hist_date)
+        hist_date = st.date_input("සතිය ආරම්භය තෝරන්න", cur_w - timedelta(days=7))
+        display_analytics(hist_date)
 
     conn.close()
