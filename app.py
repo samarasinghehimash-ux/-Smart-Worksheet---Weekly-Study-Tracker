@@ -25,52 +25,29 @@ def check_hashes(password, hashed_text): return make_hashes(password) == hashed_
 
 init_db()
 
-# --- Page Config (Force Light Theme) ---
-st.set_page_config(page_title="A/L Study Tracker Pro", layout="wide", initial_sidebar_state="expanded")
+# --- Page Config ---
+st.set_page_config(page_title="A/L Study Tracker Pro", layout="wide")
 
-# --- UI Styles (එකම සුදු පැහැය සහ Calendar එක සකස් කිරීම) ---
+# --- UI Styles (එකම වර්ණය සහ පිරිසිදු පෙනුම) ---
 st.markdown("""
     <style>
-    /* මුළු App එකම සහ Sidebar එකම සුදු පැහැයට හැරවීම */
-    [data-testid="stAppViewContainer"], [data-testid="stSidebar"], .stApp {
-        background-color: #FFFFFF !important;
-    }
+    /* Dark/Light දෙකටම ගැලපෙන සේ පසුබිම සහ අකුරු පාලනය */
+    .main-title { font-size: 2.5rem !important; font-weight: 800 !important; text-align: center; margin-bottom: 5px; }
+    .teacher-name { text-align: center; font-size: 1rem; margin-bottom: 25px; opacity: 0.8; }
     
-    /* Sidebar අකුරු කළු කිරීම */
-    [data-testid="stSidebar"] .stMarkdown, [data-testid="stSidebar"] label, [data-testid="stSidebar"] p {
-        color: #000000 !important;
-        font-weight: bold;
-    }
-
-    /* මාතෘකා සැකසුම් */
-    .main-title { font-size: 2.5rem !important; font-weight: 800 !important; color: #1e272e; text-align: center; }
-    .teacher-name { text-align: center; font-size: 0.9rem; color: #485460; margin-bottom: 30px; }
-
-    /* දත්ත කොටු (Metrics) */
-    [data-testid="stMetric"] {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 12px;
-        border: 1px solid #dfe6e9;
-    }
-
     /* විෂය ප්‍රගති කොටු (Subject Cards) */
-    .sub-card {
-        background: #ffffff;
-        padding: 20px;
-        border-radius: 15px;
-        border: 1px solid #eee;
-        border-bottom: 5px solid #0984e3;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    .subject-card { 
+        padding: 15px; 
+        border-radius: 12px; 
+        border: 1px solid #ddd;
+        border-top: 5px solid #3498db; 
         text-align: center;
+        margin-bottom: 10px;
     }
-    .sub-h { color: #0984e3; font-size: 2rem; font-weight: 800; }
+    .sub-value { font-size: 1.8rem; font-weight: 800; color: #3498db; }
     
-    /* Calendar (Date Input) එකේ පෙනුම */
-    .stDateInput div[data-baseweb="input"] {
-        background-color: #f1f2f6 !important;
-        border: 1px solid #ced4da !important;
-    }
+    /* Metrics Fix */
+    [data-testid="stMetric"] { border: 1px solid #ddd; padding: 10px; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -84,9 +61,9 @@ SUBJECTS_DATA = {
 
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- Sidebar Logic ---
+# --- Sidebar (Settings & Calendar) ---
 with st.sidebar:
-    st.markdown("### 🔐 Access Control")
+    st.header("🔐 Access Control")
     if not st.session_state.logged_in:
         u_in = st.text_input("Username")
         p_in = st.text_input("Password", type='password')
@@ -98,18 +75,17 @@ with st.sidebar:
                     st.rerun()
                 else: st.error("වැරදියි!")
     else:
-        st.write(f"Logged in as: **{st.session_state.username}**")
+        st.write(f"User: **{st.session_state.username}**")
         if st.button("Log Out"):
             st.session_state.logged_in = False; st.rerun()
-
-    if st.session_state.logged_in:
-        st.divider()
-        # --- Calendar Feature ---
-        st.markdown("### 📅 දින දර්ශනය")
-        selected_date = st.date_input("සටහන් කළ යුතු දිනය තෝරන්න", datetime.now())
         
         st.divider()
-        st.markdown("### ⚙️ විෂය සැකසුම්")
+        st.subheader("📅 දින දර්ශනය (Calendar)")
+        # දින දර්ශනය මෙතැනින් තෝරන්න
+        selected_date = st.date_input("සටහන් කිරීමට හෝ බැලීමට දිනය තෝරන්න", datetime.now())
+        
+        st.divider()
+        st.subheader("⚙️ විෂය සැකසුම්")
         conn = sqlite3.connect('alevel_tracker_final.db')
         pref = conn.execute("SELECT * FROM user_prefs WHERE username=?", (st.session_state.username,)).fetchone()
         
@@ -118,76 +94,86 @@ with st.sidebar:
         
         subs = []
         for i in range(1, 4):
-            def_val = pref[i+1] if pref and pref[i+1] in SUBJECTS_DATA[stream] else SUBJECTS_DATA[stream][i-1]
-            s = st.selectbox(f"විෂය {i}", SUBJECTS_DATA[stream], index=SUBJECTS_DATA[stream].index(def_val), key=f"s_{i}")
+            def_v = pref[i+1] if pref and pref[i+1] in SUBJECTS_DATA[stream] else SUBJECTS_DATA[stream][i-1]
+            s = st.selectbox(f"විෂය {i}", SUBJECTS_DATA[stream], index=SUBJECTS_DATA[stream].index(def_v), key=f"cfg_{i}")
             subs.append(s)
             
-        if st.button("සැකසුම් ස්ථිර කරන්න"):
+        if st.button("Settings Save"):
             conn.execute("INSERT OR REPLACE INTO user_prefs VALUES (?,?,?,?,?)", (st.session_state.username, stream, subs[0], subs[1], subs[2]))
             conn.commit(); st.rerun()
 
 # --- Main Page ---
 if st.session_state.logged_in:
-    st.markdown('<p class="main-title">🎓 A/L Smart Study Tracker Pro</p>', unsafe_allow_html=True)
-    st.markdown('<div class="teacher-name">Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span style="color:#27ae60; font-weight:bold;">Hiratrix IT Solutions</span></div>', unsafe_allow_html=True)
+    st.markdown('<p class="main-title">🎓 A/L Study Tracker Pro</p>', unsafe_allow_html=True)
+    st.markdown('<div class="teacher-name">Concept by: <b>Plan Master Charaka Dhananjaya</b> | Dev: Hiratrix IT Solutions</div>', unsafe_allow_html=True)
     
-    # --- Input Section ---
-    st.subheader(f"📍 {selected_date} දින දත්ත ඇතුළත් කිරීම")
-    c1, c2, c3 = st.columns(3)
+    # 1. Input Section
+    st.subheader(f"📝 {selected_date} දත්ත ඇතුළත් කිරීම")
+    cols = st.columns(3)
     hrs_in = []
     for i in range(3):
-        with [c1, c2, c3][i]:
+        with cols[i]:
             st.markdown(f"**{subs[i]}**")
-            h = st.number_input("පැය", 0, 24, key=f"h_in_{i}")
-            m = st.number_input("මිනිත්තු", 0, 59, key=f"m_in_{i}")
+            h = st.number_input("පැය", 0, 24, key=f"h_{i}")
+            m = st.number_input("මිනිත්තු", 0, 59, key=f"m_{i}")
             hrs_in.append(h + (m/60))
             
-    if st.button("දත්ත සුරකින්න (SAVE DATA)"):
+    if st.button("දත්ත සුරකින්න (SAVE)"):
         conn.execute('INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h', 
                      (st.session_state.username, str(selected_date), stream, subs[0], hrs_in[0], subs[1], hrs_in[1], subs[2], hrs_in[2]))
-        conn.commit(); st.success(f"{selected_date} දත්ත සුරැකුණා!")
+        conn.commit(); st.success(f"{selected_date} දත්ත සුරැකුණා!"); st.rerun()
 
     st.divider()
 
-    # --- Weekly Analytics ---
-    st.subheader("📊 සතිපතා ප්‍රගති වාර්තාව")
-    start_week = selected_date - timedelta(days=selected_date.weekday())
-    df = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username='{st.session_state.username}'", conn)
-    
-    if not df.empty:
-        df['date'] = pd.to_datetime(df['date']).dt.date
-        week_df = df[(df['date'] >= start_week) & (df['date'] <= start_week + timedelta(days=6))].sort_values('date')
-        
-        if not week_df.empty:
-            total = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
-            
-            # කොටු 3 (Metrics)
-            m1, m2, m3 = st.columns(3)
-            m1.metric("📅 සතියේ මුළු පැය", f"{total:.1f} h")
-            m2.metric("📊 දිනක සාමාන්‍යය", f"{(total/7):.1f} h")
-            m3.metric("✅ වාර්තා කළ දින", f"{len(week_df)}/7")
-            
-            # විෂය කාඩ්පත්
-            st.markdown("### 📚 විෂයන් අනුව ප්‍රගතිය")
-            sc1, sc2, sc3 = st.columns(3)
-            for i in range(3):
-                val = week_df[f'sub{i+1}_h'].sum()
-                [sc1, sc2, sc3][i].markdown(f'<div class="sub-card"><p>{subs[i]}</p><p class="sub-h">{val:.1f} h</p></div>', unsafe_allow_html=True)
+    # 2. Analytics Tabs (වර්තමාන සතිය සහ පැරණි දත්ත බැලීම)
+    tab1, tab2 = st.tabs(["📊 තෝරාගත් සතියේ වාර්තාව", "🔍 ඉතිහාසය (History)"])
 
-            # Grouped Bar Chart (දිනකට තීරු 3)
-            st.markdown("### 📈 ප්‍රගති ප්‍රස්ථාරය")
-            fig, ax = plt.subplots(figsize=(12, 5))
-            x_idx = np.arange(len(week_df['date']))
-            bar_w = 0.25
+    def show_report(start_dt):
+        df = pd.read_sql_query(f"SELECT * FROM study_logs WHERE username='{st.session_state.username}'", conn)
+        if not df.empty:
+            df['date'] = pd.to_datetime(df['date']).dt.date
+            week_df = df[(df['date'] >= start_dt) & (df['date'] <= start_dt + timedelta(days=6))].sort_values('date')
             
-            ax.bar(x_idx - bar_w, week_df['sub1_h'], bar_w, label=subs[0], color='#2ecc71')
-            ax.bar(x_idx, week_df['sub2_h'], bar_w, label=subs[1], color='#3498db')
-            ax.bar(x_idx + bar_w, week_df['sub3_h'], bar_w, label=subs[2], color='#f1c40f')
-            
-            ax.set_xticks(x_idx)
-            ax.set_xticklabels(week_df['date'].astype(str), rotation=35)
-            ax.legend()
-            st.pyplot(fig)
-        else: st.info("තෝරාගත් සතියේ දත්ත නොමැත.")
-    else: st.warning("දත්ත ඇතුළත් කර නැත.")
+            if not week_df.empty:
+                total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
+                
+                # Metrics
+                m1, m2, m3 = st.columns(3)
+                m1.metric("සතියේ මුළු පැය", f"{total_h:.1f} h")
+                m2.metric("දිනක සාමාන්‍යය", f"{(total_h/7):.1f} h")
+                m3.metric("සටහන් කළ දින", f"{len(week_df)}/7")
+                
+                # Subject Cards
+                st.write("")
+                sc = st.columns(3)
+                for i in range(3):
+                    val = week_df[f'sub{i+1}_h'].sum()
+                    sc[i].markdown(f'<div class="subject-card"><p>{subs[i]}</p><p class="sub-value">{val:.1f} h</p></div>', unsafe_allow_html=True)
+
+                # Grouped Bar Chart
+                st.markdown("### 📈 ප්‍රගති ප්‍රස්ථාරය")
+                fig, ax = plt.subplots(figsize=(12, 5))
+                x = np.arange(len(week_df['date']))
+                width = 0.25
+                ax.bar(x - width, week_df['sub1_h'], width, label=subs[0], color='#2ecc71')
+                ax.bar(x, week_df['sub2_h'], width, label=subs[1], color='#3498db')
+                ax.bar(x + width, week_df['sub3_h'], width, label=subs[2], color='#f1c40f')
+                ax.set_xticks(x)
+                ax.set_xticklabels(week_df['date'].astype(str), rotation=30)
+                ax.legend(); st.pyplot(fig)
+            else: st.info("මෙම කාලසීමාවට දත්ත නොමැත.")
+        else: st.warning("දත්ත කිසිවක් නැත.")
+
+    with tab1:
+        # තෝරාගත් දිනට අදාළ සතියේ ආරම්භය (සදුදා)
+        monday = selected_date - timedelta(days=selected_date.weekday())
+        st.info(f"ප්‍රගතිය පෙන්වන්නේ: {monday} සිට {monday + timedelta(days=6)} දක්වා")
+        show_report(monday)
+
+    with tab2:
+        st.subheader("🔍 පැරණි වාර්තා පරීක්ෂා කිරීම")
+        h_date = st.date_input("ආරම්භක දිනය තෝරන්න", monday - timedelta(days=7), key="history_cal")
+        if st.button("වාර්තාව පෙන්වන්න"):
+            show_report(h_date)
+
     conn.close()
