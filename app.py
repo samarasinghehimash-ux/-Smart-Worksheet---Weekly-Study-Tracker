@@ -14,7 +14,6 @@ def init_db():
         cursor.execute('''CREATE TABLE IF NOT EXISTS study_logs 
                           (username TEXT, date TEXT, stream TEXT, sub1_name TEXT, sub1_h REAL, 
                            sub2_name TEXT, sub2_h REAL, sub3_name TEXT, sub3_h REAL, UNIQUE(username, date))''')
-        # Admin account
         admin_pass = hashlib.sha256(str.encode("admin123")).hexdigest()
         cursor.execute("INSERT OR IGNORE INTO users VALUES (?, ?)", ("admin", admin_pass))
         conn.commit()
@@ -36,7 +35,9 @@ st.markdown("""
     div[data-testid="stMetric"] { background-color: #ffffff !important; padding: 15px; border-radius: 12px; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
     .subject-card { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; color: #000000 !important; margin-bottom: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .business-name { color: #2ecc71 !important; font-weight: bold; font-size: 1.2rem; }
-    .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    
+    /* Feedback Box එක සඳහා පරතරය (Margin-bottom) */
+    .feedback-box { padding: 15px; border-radius: 12px; text-align: center; font-size: 1.3rem; font-weight: bold; margin-top: 20px; margin-bottom: 40px; border: 2px solid; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -49,13 +50,16 @@ SUBJECTS_DATA = {
     "Technology": ["SFT", "Engineering Tech", "Bio Systems Tech", "ICT"]
 }
 
+# Session State Initialize
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+for i in range(3):
+    if f'h{i}' not in st.session_state: st.session_state[f'h{i}'] = 0
+    if f'm{i}' not in st.session_state: st.session_state[f'm{i}'] = 0
 
-# --- Sidebar: Login & Registration ---
+# --- Sidebar Login/Register ---
 st.sidebar.title("🔐 Access Control")
 if not st.session_state.logged_in:
     auth_mode = st.sidebar.radio("තෝරන්න", ["Login (ඇතුළු වන්න)", "Register (අලුතින් එක්වන්න)"])
-    
     u_in = st.sidebar.text_input("Username")
     p_in = st.sidebar.text_input("Password", type='password')
     
@@ -67,18 +71,15 @@ if not st.session_state.logged_in:
                         conn.execute("INSERT INTO users VALUES (?, ?)", (u_in, make_hashes(p_in)))
                         conn.commit()
                     st.sidebar.success("ගිණුම සාදා අවසන්! දැන් Login වන්න.")
-                except sqlite3.IntegrityError:
-                    st.sidebar.error("මෙම නම දැනටමත් පද්ධතියේ ඇත.")
-            else: st.sidebar.warning("කරුණාකර විස්තර ඇතුළත් කරන්න.")
-            
-    else: # Login mode
+                except sqlite3.IntegrityError: st.sidebar.error("මෙම නම දැනටමත් ඇත.")
+    else:
         if st.sidebar.button("ඇතුළු වන්න"):
             with sqlite3.connect('alevel_tracker_final.db') as conn:
                 data = conn.execute('SELECT password FROM users WHERE username =?', (u_in,)).fetchone()
                 if data and check_hashes(p_in, data[0]):
                     st.session_state.logged_in, st.session_state.username = True, u_in
                     st.rerun()
-                else: st.sidebar.error("Username හෝ Password වැරදියි.")
+                else: st.sidebar.error("දත්ත වැරදියි.")
 else:
     st.sidebar.success(f"පරිශීලක: {st.session_state.username}")
     if st.sidebar.button("Log Out"):
@@ -94,9 +95,14 @@ def display_full_analytics(df, start_date):
     if not week_df.empty:
         total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
         
+        # Feedback Box with increased margin
         if total_h < 40:
-            st.markdown(f'<div style="background-color: #ffebee; color: #c62828; padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; border: 2px solid #ef9a9a;">😟 ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව ගොඩක් මහන්සි වෙන්න! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
-        
+            st.markdown(f'<div class="feedback-box" style="background-color: #ffebee; color: #c62828; border-color: #ef9a9a;">😟 ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව ගොඩක් මහන්සි වෙන්න! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
+        elif total_h < 60:
+            st.markdown(f'<div class="feedback-box" style="background-color: #e8f5e9; color: #2e7d32; border-color: #a5d6a7;">🙂 ඉතා හොඳයි! තව උත්සාහ කරන්න! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div class="feedback-box" style="background-color: #fff8e1; color: #ff8f00; border-color: #ffe082;">🔥 සුපිරි! ඔබ ඉතා දක්ෂ ලෙස වැඩ කර තිබෙනවා! (මුළු පැය: {total_h:.1f})</div>', unsafe_allow_html=True)
+
         m1, m2, m3 = st.columns(3)
         m1.metric("📅 සතියේ මුළු පැය", f"{total_h:.1f} h")
         m2.metric("📊 දිනකට සාමාන්‍යය", f"{(total_h/7):.1f} h")
@@ -109,7 +115,7 @@ def display_full_analytics(df, start_date):
         
         cols = st.columns(3)
         for i in range(3):
-            cols[i].markdown(f"<div class='subject-card'><span style='color: #000;'>විෂය: {sub_names[i]}</span><br><span style='font-size: 1.5rem; color: #2196f3;'>{sub_totals[i]:.1f} h</span></div>", unsafe_allow_html=True)
+            cols[i].markdown(f"<div class='subject-card'>විෂය: {sub_names[i]}<br><span style='font-size: 1.5rem; color: #2196f3;'>{sub_totals[i]:.1f} h</span></div>", unsafe_allow_html=True)
         
         st.markdown(f"### 📈 ප්‍රගති ප්‍රස්ථාරය ({start_date} සිට {end_date} දක්වා)")
         fig, ax = plt.subplots(figsize=(12, 5))
@@ -125,7 +131,7 @@ def display_full_analytics(df, start_date):
 
 # --- Main App ---
 if st.session_state.logged_in:
-    st.markdown('<p class="main-title">🎓 A/L Smart Study Tracker Pro</p>', unsafe_allow_html=True)
+    st.markdown('<p class="main-title">🎓 A/L Study Tracker Pro</p>', unsafe_allow_html=True)
     st.markdown("<div style='text-align: center;'>Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class='business-name'>Hiratrix IT Solutions</span></div>", unsafe_allow_html=True)
     st.divider()
 
@@ -147,12 +153,13 @@ if st.session_state.logged_in:
         with tab1:
             st.sidebar.subheader("📝 දත්ත සටහන් කරන්න")
             e_date = st.sidebar.date_input("දිනය", datetime.now())
-            stream = st.sidebar.selectbox("විෂය ධාරාව", list(SUBJECTS_DATA.keys()))
+            stream = st.sidebar.selectbox("ධාරාව", list(SUBJECTS_DATA.keys()))
             names, hrs = [], []
             for i in range(3):
                 st.sidebar.write(f"--- විෂය {i+1} ---")
                 n = st.sidebar.selectbox(f"විෂය {i+1}", SUBJECTS_DATA[stream], key=f"n{i}", index=i)
                 c1, c2 = st.sidebar.columns(2)
+                # Input with Session State to Reset
                 h = c1.number_input("පැය", 0, 24, key=f"h{i}")
                 m = c2.number_input("මිනිත්තු", 0, 59, key=f"m{i}")
                 names.append(n); hrs.append(h + (m/60))
@@ -160,10 +167,15 @@ if st.session_state.logged_in:
             if st.sidebar.button("දත්ත සුරකින්න (SAVE)"):
                 conn.execute('INSERT INTO study_logs VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(username, date) DO UPDATE SET sub1_h=excluded.sub1_h, sub2_h=excluded.sub2_h, sub3_h=excluded.sub3_h', 
                              (st.session_state.username, str(e_date), stream, names[0], hrs[0], names[1], hrs[1], names[2], hrs[2]))
-                conn.commit(); st.rerun()
+                conn.commit()
+                # Reset Inputs to Zero
+                for i in range(3):
+                    st.session_state[f'h{i}'] = 0
+                    st.session_state[f'm{i}'] = 0
+                st.rerun()
 
+            # Delete Buttons
             st.sidebar.divider()
-            st.sidebar.subheader("🗑️ දත්ත කළමනාකරණය")
             if st.sidebar.button("🗑️ අද දත්ත මකන්න"):
                 conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date='{e_date}'")
                 conn.commit(); st.rerun()
@@ -185,5 +197,4 @@ if st.session_state.logged_in:
             if not my_data.empty: display_full_analytics(my_data, o_date)
 
     conn.close()
-else:
-    st.warning("⚠️ පද්ධතිය භාවිතා කිරීමට කරුණාකර Sidebar එක හරහා Login හෝ Register වන්න.")
+else: st.warning("⚠️ පද්ධතිය භාවිතා කිරීමට Sidebar එක හරහා Login හෝ Register වන්න.")
