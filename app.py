@@ -35,6 +35,7 @@ st.markdown("""
     .subject-card { background-color: #ffffff; padding: 15px; border-radius: 10px; border-left: 8px solid #2196f3; color: #000000 !important; margin-bottom: 10px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .business-name { color: #2ecc71; font-weight: bold; font-size: 1.2rem; }
     .section-head { background-color: #f1f1f1; padding: 5px 15px; border-radius: 5px; color: #333; font-weight: bold; margin: 10px 0; }
+    .stAlert { border-radius: 10px !important; border: 2px solid #ff4b4b !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -48,7 +49,7 @@ SUBJECTS_DATA = {
 
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- Sidebar Logic ---
+# --- Sidebar Login/Logout ---
 st.sidebar.title("🔐 Access Control")
 
 if not st.session_state.logged_in:
@@ -78,7 +79,7 @@ else:
         st.session_state.logged_in = False
         st.rerun()
 
-# --- Main App Logic ---
+# --- Main App ---
 if st.session_state.logged_in:
     st.markdown('<p class="main-title">🎓 A/L Smart Study Tracker Pro</p>', unsafe_allow_html=True)
     st.markdown(f"<div style='text-align: center;'>Concept by: <b>Plan Master Charaka Dhananjaya</b> | Developed by: <span class='business-name'>Hiratrix IT Solutions</span></div>", unsafe_allow_html=True)
@@ -103,11 +104,10 @@ if st.session_state.logged_in:
     else:
         user_stream, user_sub1, user_sub2, user_sub3 = pref
         
-        # Sidebar Data Entry
+        # Data Entry Sidebar
         st.sidebar.divider()
         st.sidebar.subheader("📝 අද දත්ත ඇතුළත් කිරීම")
-        st.sidebar.info(f"විෂය ධාරාව: {user_stream}")
-        entry_date = st.sidebar.date_input("දිනය", datetime.now(), key="main_entry_date")
+        entry_date = st.sidebar.date_input("දිනය", datetime.now(), key="entry_d")
         
         hours_input = []
         for s_name in [user_sub1, user_sub2, user_sub3]:
@@ -124,7 +124,7 @@ if st.session_state.logged_in:
                              (st.session_state.username, str(entry_date), user_stream, user_sub1, hours_input[0], user_sub2, hours_input[1], user_sub3, hours_input[2]))
             st.rerun()
 
-        # Tabs for Display
+        # Reports
         tab1, tab2 = st.tabs(["📊 අද වාර්තාව", "🔍 ඉතිහාසය"])
 
         with sqlite3.connect('alevel_tracker_final.db') as conn:
@@ -137,13 +137,23 @@ if st.session_state.logged_in:
                 end_date = start_date + timedelta(days=6)
                 mask = (all_data['date'] >= start_date) & (all_data['date'] <= end_date)
                 week_df = all_data.loc[mask].sort_values('date')
+                
                 if not week_df.empty:
-                    st.markdown('<div class="section-head">📅 සතියේ සම්පූර්ණ සාරාංශය</div>', unsafe_allow_html=True)
                     total_h = week_df[['sub1_h', 'sub2_h', 'sub3_h']].sum().sum()
+                    
+                    # --- 💡 දිරිමත් කිරීමේ පණිවිඩය (Motivation Alert) ---
+                    if total_h < 20:
+                        st.error(f"⚠️ ඔබ තවමත් දුර්වල මට්ටමක සිටින්නේ. තව මහන්සි වෙන්න! (සතියේ පැය: {total_h:.1f})")
+                    elif total_h < 40:
+                        st.warning(f"⚡ හොඳයි, නමුත් මීට වඩා කැපවීමක් අවශ්‍යයි! (සතියේ පැය: {total_h:.1f})")
+                    else:
+                        st.success(f"🌟 විශිෂ්ටයි! ඔබ ඉතා හොඳින් පාඩම් කරනවා. දිගටම කරගෙන යන්න! (සතියේ පැය: {total_h:.1f})")
+
+                    st.markdown('<div class="section-head">📅 සතියේ සම්පූර්ණ සාරාංශය</div>', unsafe_allow_html=True)
                     m1, m2, m3 = st.columns(3)
                     m1.metric("සතියේ මුළු කාලය", f"{total_h:.1f} h")
                     m2.metric("දෛනික සාමාන්‍යය", f"{(total_h/7):.1f} h")
-                    m3.metric("සටහන් කළ දින ගණන", f"{len(week_df)} / 7")
+                    m3.metric("සටහන් කළ දින", f"{len(week_df)} / 7")
                     
                     st.markdown('<div class="section-head">📚 සතියේ එක් එක් විෂයන්ගේ සාරාංශය</div>', unsafe_allow_html=True)
                     names = [user_sub1, user_sub2, user_sub3]
@@ -157,47 +167,38 @@ if st.session_state.logged_in:
                     week_df.plot(kind='bar', x='date', ax=ax, color=['#2ecc71', '#3498db', '#e67e22'])
                     ax.legend(names)
                     st.pyplot(fig)
-                else: st.warning("මෙම කාලසීමාව සඳහා දත්ත නොමැත.")
-            else: st.info("දත්ත ඇතුළත් කළ පසු මෙහි දිස්වනු ඇත.")
+                else: st.warning("දත්ත නොමැත.")
+            else: st.info("දත්ත ඇතුළත් කළ පසු මෙහි දිස්වේ.")
 
         with tab1:
-            main_start = st.date_input("ප්‍රස්ථාරය සඳහා ආරම්භක දිනය", datetime.now() - timedelta(days=6), key="tab1_start")
+            main_start = st.date_input("ප්‍රස්ථාරය සඳහා ආරම්භක දිනය", datetime.now() - timedelta(days=6), key="t1")
             show_stats(main_start)
 
         with tab2:
-            old_start = st.date_input("පැරණි වාර්තා සඳහා දිනය තෝරන්න", datetime.now() - timedelta(days=14), key="tab2_start")
+            old_start = st.date_input("පැරණි වාර්තා සඳහා දිනය තෝරන්න", datetime.now() - timedelta(days=14), key="t2")
             show_stats(old_start)
 
-        # --- 🗑️ දත්ත කළමනාකරණය (DELETE BUTTONS) ---
+        # Delete Actions
         st.sidebar.divider()
         st.sidebar.subheader("🗑️ දත්ත කළමනාකරණය")
-        
-        if st.sidebar.button("අද දවසේ දත්ත මකන්න"):
+        if st.sidebar.button("අද දත්ත මකන්න"):
             with sqlite3.connect('alevel_tracker_final.db') as conn:
                 conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date='{entry_date}'")
-            st.sidebar.warning(f"{entry_date} දත්ත මැකුණා!")
             st.rerun()
-
-        if st.sidebar.button("මේ සතියේ දත්ත මකන්න"):
-            # Tab 1 හි පෙන්වන සතියේ දත්ත මකයි
+        if st.sidebar.button("මෙම සතියේ දත්ත මකන්න"):
             w_start, w_end = str(main_start), str(main_start + timedelta(days=6))
             with sqlite3.connect('alevel_tracker_final.db') as conn:
                 conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}' AND date BETWEEN '{w_start}' AND '{w_end}'")
-            st.sidebar.warning("තෝරාගත් සතියේ දත්ත මැකුණා!")
             st.rerun()
-
-        if st.sidebar.button("සියලු දත්ත මකා දමන්න"):
+        if st.sidebar.button("සියලු දත්ත මකන්න"):
             with sqlite3.connect('alevel_tracker_final.db') as conn:
                 conn.execute(f"DELETE FROM study_logs WHERE username='{st.session_state.username}'")
-            st.sidebar.error("ඔබගේ සියලු දත්ත මැකී ගියා!")
             st.rerun()
-
-        with st.sidebar.expander("⚙️ විෂයයන් වෙනස් කිරීමට"):
-            if st.button("විෂය සැකසුම් Reset කරන්න"):
+        
+        with st.sidebar.expander("⚙️ විෂයයන් Reset කරන්න"):
+            if st.button("Reset Settings"):
                 with sqlite3.connect('alevel_tracker_final.db') as conn:
                     conn.execute('DELETE FROM user_preferences WHERE username=?', (st.session_state.username,))
-                    conn.commit()
                 st.rerun()
-
 else:
     st.info("පද්ධතිය භාවිතා කිරීමට කරුණාකර Login වන්න.")
